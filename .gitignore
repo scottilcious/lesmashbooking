@@ -1,5 +1,7 @@
 logs/
 uploads/
 *.sql
+!database/schema.sql
 .DS_Store
 config.local.php
+config.*.local.php
