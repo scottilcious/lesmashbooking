@@ -2,7 +2,7 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/booking-functions.php';
 
     $booking_type           = $_POST['booking_type'];
     $date                   = $_POST['date'];

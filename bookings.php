@@ -24,8 +24,8 @@ require 'config.php';
 </head>
 <body class="page-id-2">
     <?php include "menu.php"; 
-    include 'includes/member-functions.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/member-functions.php';
+    include_once 'includes/booking-functions.php';
 
 
     // Fetch user bookings

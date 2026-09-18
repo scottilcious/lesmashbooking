@@ -56,7 +56,8 @@ Do not build on them.
 ## Rules for changes
 
 - Run `php tests/run.php` before committing. Add a test for every behaviour change in `includes/`.
-- Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script.
+- Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script. Guest offers are admin-confirmed only.
+- Include shared library files with `require_once`/`include_once` (pages mix orders; a plain `include` redeclares functions).
 - Passwords: never compare `member_password` in SQL. Look the member up, then `lsc_password_verify()`. Write with `lsc_password_for_storage()`; display to admins with `lsc_password_decrypt()`. The key is `PASSWORD_ENCRYPTION_KEY` in `config.local.php` and must be backed up.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.

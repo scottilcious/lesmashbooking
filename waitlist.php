@@ -1,4 +1,5 @@
 <?php
+ob_start(); // allows redirects after the header has been rendered
 // Database connection
 require 'config.php';
 ?>
@@ -24,8 +25,8 @@ require 'config.php';
 </head>
 <body class="page-id-2">
     <?php include "menu.php"; 
-    include 'includes/member-functions.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/member-functions.php';
+    include_once 'includes/booking-functions.php';
 
 
     // Fetch user waitlist
@@ -69,7 +70,10 @@ require 'config.php';
     $waitlist_action  = $_GET['waitlist_action'] ?? '';   // confirm | decline
     $waitlist_id      = (int) ($_GET['waitlist_id'] ?? 0);
     $waitlist_notice  = null; // ['type' => bootstrap alert type, 'title' => ..., 'body' => html, 'links' => [[label, href, class]]]
-    $actor            = ['member_id' => (int) $userId, 'is_admin' => false];
+    $is_guest_user    = ($memberType == 'non-member');
+    $actor            = $is_guest_user
+        ? ['non_member_id' => (int) $userId, 'is_admin' => false]
+        : ['member_id' => (int) $userId, 'is_admin' => false];
 
     if ($waitlist_action === 'confirm' && $waitlist_id > 0) {
         if (!lsc_is_booking_window_open_for_member($memberType)) {
@@ -78,6 +82,7 @@ require 'config.php';
         } else {
             $r = lsc_waitlist_confirm($pdo, $waitlist_id, $actor);
             if ($r['ok']) {
+                ob_end_clean();
                 header('Location: waitlist.php?waitlist_result=confirmed&amount=' . (int) $r['amount']);
                 exit;
             }
@@ -95,6 +100,10 @@ require 'config.php';
                 case 'forbidden':
                     $waitlist_notice = ['type' => 'danger', 'title' => 'This waitlist entry does not belong to your account', 'body' => '', 'links' => []];
                     break;
+                case 'admin_only':
+                    $waitlist_notice = ['type' => 'info', 'title' => 'Our staff will confirm this booking for you',
+                        'body' => 'Guest waitlist bookings are confirmed by the club after payment. Please contact the reception if you have not heard from us.', 'links' => []];
+                    break;
                 default:
                     $waitlist_notice = ['type' => 'danger', 'title' => 'This offer is no longer open',
                         'body' => 'Its current status is <b>' . htmlspecialchars((string) ($r['status'] ?? $r['reason'])) . '</b>.', 'links' => []];
@@ -103,6 +112,7 @@ require 'config.php';
     } elseif ($waitlist_action === 'decline' && $waitlist_id > 0) {
         $r = lsc_waitlist_decline($pdo, $waitlist_id, $actor, 'declined');
         if ($r['ok']) {
+            ob_end_clean();
             header('Location: waitlist.php?waitlist_result=declined');
             exit;
         }
@@ -180,7 +190,9 @@ require 'config.php';
                             <td><?= htmlspecialchars($booking['timeslot']) ?></td>
                             <td>
                                 <?php 
-                                    if( $booking['waitlist_status'] == 'pending'){
+                                    if( $booking['waitlist_status'] == 'pending' && $is_guest_user ){
+                                        echo '<span class="badge text-bg-warning">Reserved - staff will confirm</span>';
+                                    }else if( $booking['waitlist_status'] == 'pending'){
                                         echo '<span class="badge text-bg-warning">Pending Confirmation</span>';
                                     }else if( $booking['waitlist_status'] == 'confirmed' ){
                                         echo '<span class="badge text-bg-success">Confirmed</span>';
@@ -194,7 +206,11 @@ require 'config.php';
                                 ?>
                             </td>
                             <td>
-                                <?php if( $booking['waitlist_status'] == 'pending'){ ?>
+                                <?php if( $booking['waitlist_status'] == 'pending' && $is_guest_user ){ ?>
+                                    <p class="mb-1">Court <?= htmlspecialchars((string) $booking['free_court']) ?> is reserved for you.<br>
+                                    <b><?= number_format(lsc_waitlist_total_price($booking['timeslot'], $booking['waitlist_note'], true)) ?> THB</b> - our staff will contact you to confirm and take payment.</p>
+                                    <a href="waitlist.php?waitlist_action=decline&waitlist_id=<?= $booking['wait_list_id'] ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('Decline this offer? The court will go to the next person on the waitlist.')">I no longer want this slot</a>
+                                <?php }else if( $booking['waitlist_status'] == 'pending'){ ?>
                                     <a href="waitlist.php?waitlist_action=confirm&waitlist_id=<?= $booking['wait_list_id'] ?>" class="btn btn-success">Confirm Booking</a><br>
                                     <span class="text-primary">Court <?= htmlspecialchars((string) $booking['free_court']) ?> &middot; <?= number_format(lsc_waitlist_total_price($booking['timeslot'], $booking['waitlist_note'])) ?> THB will be deducted from your credit</span>
                                     <hr>

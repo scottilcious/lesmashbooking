@@ -23,7 +23,7 @@ require 'config.php';
 </head>
 <body class="page-id-3">
     <?php include "menu.php"; 
-    include 'includes/member-functions.php';
+    include_once 'includes/member-functions.php';
 
     //search and filter 
     $search_member = $_GET['search_member'];

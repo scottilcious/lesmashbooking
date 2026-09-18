@@ -86,7 +86,9 @@ All logic is in `includes/waitlist-service.php`:
 - `lsc_waitlist_decline(...)` and `lsc_waitlist_expire_stale($pdo)` release the court and immediately
   offer it to the next waiting member. The sweep runs lazily on `waitlist.php` and from `cron/waitlist-expire.php`.
 - Offers expire 2 h after `wait_list.updated_at` or when the slot is within 2 h of starting.
-- Guest (non-member) waitlist entries are never offered; they have no credit balance.
+- Guest (non-member) entries share the queue. Their offers can only be confirmed by an admin
+  (`$actor['is_admin']` with `payment` cash|qr); `lsc_waitlist_confirm` returns `admin_only` otherwise.
+  `lsc_waitlist_pending_offers()` and `lsc_waitlist_pending_guest_count()` feed `admin-waitlist.php` and the menu badge.
 
 Useful query:
 
@@ -113,7 +115,7 @@ when it grows past a few tens of MB.
 
 ## Send notifications
 
-- LINE broadcast: `lsc_send_line_broadcast($message, $accessToken)`.
+- LINE broadcast: `lsc_send_line_broadcast($message, LINE_BROADCAST_TOKEN)`. Inside the waitlist service use `lsc_waitlist_notify('line', '', $msg)` so tests can capture it.
 - SMS: `send_sms_mkt($phone, $message)` in `booking_functions/dynamic-waitlist.php`.
 - Both are suppressed and logged when `DISABLE_NOTIFICATIONS` is true.
 

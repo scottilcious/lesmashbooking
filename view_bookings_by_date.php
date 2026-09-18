@@ -1,7 +1,7 @@
 <?php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
-    include 'includes/member-functions.php';
+    include_once 'includes/member-functions.php';
 
     $todayDate = $_POST['date'];
     $member_type = $_POST['member_type'];

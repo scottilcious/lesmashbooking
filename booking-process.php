@@ -23,7 +23,7 @@
 <body> 
 
 <?php 
-include "includes/functions.php";
+include_once "includes/functions.php";
 
 $booking_court = $_POST['booking_court'];
 $booking_date = $_POST['booking_date'];

@@ -104,7 +104,7 @@ function lsc_credit_transaction_where(): string
 </head>
 <body>
     <?php include "menu.php"; 
-    include 'includes/member-functions.php';
+    include_once 'includes/member-functions.php';
 
     // Fetch user bookings
     //$stmt = $pdo->prepare("SELECT * FROM bookings WHERE member_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?");

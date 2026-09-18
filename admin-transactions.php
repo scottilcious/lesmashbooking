@@ -25,7 +25,7 @@ require 'config.php';
 <body class="page-id-5">
 <?php
 include "menu.php";
-include 'includes/member-functions.php';
+include_once 'includes/member-functions.php';
 
 function paginate($totalPages, $currentPage) {
     $maxPagesToShow = 12;

@@ -73,6 +73,15 @@ function t_member(array $o = []): int
     return (int) t_pdo()->lastInsertId();
 }
 
+function t_guest(array $o = []): int
+{
+    $d = array_merge(['guest_name' => 'Guest', 'member_phone' => '0899999999', 'member_email' => 'guest@example.com'], $o);
+    $cols = implode(',', array_keys($d));
+    $ph = implode(',', array_fill(0, count($d), '?'));
+    t_pdo()->prepare("INSERT INTO non_members ($cols) VALUES ($ph)")->execute(array_values($d));
+    return (int) t_pdo()->lastInsertId();
+}
+
 function t_booking(array $o = []): int
 {
     $d = array_merge([

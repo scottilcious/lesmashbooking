@@ -24,7 +24,7 @@ require 'config.php';
 </head>
 <body>
     <?php include "menu.php"; 
-    include 'includes/member-functions.php';
+    include_once 'includes/member-functions.php';
     
     ?>
     <div class="banner">

@@ -9,7 +9,7 @@ if (!isset($_SESSION['logged_in']) ) {
   exit();
 }
 
-include 'includes/functions.php';
+include_once 'includes/functions.php';
 
 $userId = $_SESSION['user_id'];
 $memberNumber = $_SESSION['member_number'];
@@ -17,6 +17,12 @@ $memberType = $_SESSION['member_type'];
 
 
 $memberData = get_member_info($userId, $memberType);
+
+$lsc_pending_guest_offers = 0;
+if ($memberType == 'admin') {
+    require_once 'includes/waitlist-service.php';
+    $lsc_pending_guest_offers = lsc_waitlist_pending_guest_count($pdo);
+}
 $memberCredit = $memberData['credit'];
 $memberPhone = $memberData['member_phone'];
 //$memberType = $memberData['member_type'];
@@ -39,7 +45,7 @@ $memberPhone = $memberData['member_phone'];
             <a href="index.php" class="menu-item page-id-1"><i class="ri-calendar-schedule-fill"></i> Make a booking</a>
             <?php if( $memberType  == 'admin' ): ?>
               <a href="admin-bookings.php" class="menu-item page-id-2"><i class="ri-calendar-check-fill"></i>All bookings</a>
-              <!-- <a href="admin-waitlist.php" class="menu-item page-id-6"><i class="ri-time-fill"></i>Waitlist</a> -->
+              <a href="admin-waitlist.php" class="menu-item page-id-6"><i class="ri-time-fill"></i>Waitlist<?php if ($lsc_pending_guest_offers > 0): ?> <span class="badge rounded-pill text-bg-danger" title="Guest offers waiting for admin confirmation"><?= $lsc_pending_guest_offers ?></span><?php endif; ?></a>
             <?php else: ?>
               <a href="bookings.php" class="menu-item page-id-2"><i class="ri-calendar-check-fill"></i>My bookings</a>
             <?php endif; ?>

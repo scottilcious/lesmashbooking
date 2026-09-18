@@ -1,7 +1,7 @@
 <?php 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/booking-functions.php';
 
     $booking_type           = $_POST['booking_type'];
     $allowed_academy_booking_types = ['junior_academy', 'adult_clinic', 'tennis_camp', 'tournament'];

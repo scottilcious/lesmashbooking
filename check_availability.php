@@ -1,8 +1,8 @@
 <?php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
-    include 'includes/member-functions.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/member-functions.php';
+    include_once 'includes/booking-functions.php';
 
     //Passed params
     //$court = $_POST['court'];

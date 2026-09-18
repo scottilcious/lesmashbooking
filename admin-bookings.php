@@ -24,6 +24,14 @@ require 'config.php';
 </head>
 <body class="page-id-2">
     <?php include "menu.php"; 
+    if ($memberType == 'admin' && !empty($lsc_pending_guest_offers)): ?>
+        <div class="container mt-3">
+            <div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert">
+                <div><b><?= (int) $lsc_pending_guest_offers ?></b> guest waitlist offer<?= $lsc_pending_guest_offers > 1 ? 's are' : ' is' ?> waiting for admin confirmation.</div>
+                <a href="admin-waitlist.php" class="btn btn-warning btn-sm">Open waitlist</a>
+            </div>
+        </div>
+    <?php endif;
     
     $times = [
         "6-7am", "7-8am", "8-9am", "9-10am", "10-11am", "11am-12pm", "12-1pm",

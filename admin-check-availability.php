@@ -6,7 +6,7 @@ if (!isset($_SESSION["user_id"])) {
     die("Unauthorized access.");
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    include 'includes/booking-functions.php';
+    include_once 'includes/booking-functions.php';
 
     $date = $_POST['date'];
     $booking_id = $_POST['booking_id'];

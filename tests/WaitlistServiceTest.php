@@ -10,9 +10,10 @@ const T_DATE = '2026-10-07';
 function t_clock(string $ts): void { lsc_waitlist_now(new DateTimeImmutable($ts)); }
 
 $smsLog = [];
-lsc_waitlist_set_notifier(function ($phone, $msg) use (&$smsLog) { $smsLog[] = [$phone, $msg]; });
+lsc_waitlist_set_notifier(function ($channel, $to, $msg) use (&$smsLog) { if ($channel === 'sms') { $smsLog[] = [$to, $msg]; } else { $GLOBALS['lineLog'][] = $msg; } });
 
 function t_sms(): array { global $smsLog; $s = $smsLog; $smsLog = []; return $s; }
+function t_line(): array { $s = $GLOBALS['lineLog'] ?? []; $GLOBALS['lineLog'] = []; return $s; }
 
 /* ---------------- pricing ---------------- */
 
@@ -83,12 +84,117 @@ test('offer: skipped when the court is not actually free', function () {
     assert_null(t_row('wait_list', '1')['waitlist_status']);
 });
 
-test('offer: guest (non-member) waitlist entries are skipped', function () {
-    t_clock(T_NOW);
-    t_waitlist(['member_id' => 90002, 'non_member_id' => 55, 'member_type' => 'non-member', 'date' => T_DATE]);
-    assert_null(lsc_waitlist_offer_slot(t_pdo(), 1, T_DATE, '7-8am'));
+test('guest price: court + daily fee + coach + extra players', function () {
+    assert_same(660, lsc_waitlist_total_price('7-8am', 'ping,p@x.com,081,Individual,,0', true));
+    assert_same(160 + 950 + 750 + 600, lsc_waitlist_total_price('7-8am', 'kat,k@x.com,065,Family,Assistant coach,3', true));
+    assert_same(280 + 500, lsc_waitlist_total_price('8-9pm', 'x,,,Individual,,0', true));
+    assert_same(160 + 500, lsc_waitlist_total_price('7-8am', 'x,,,,,0', true), 'unknown daily type defaults to individual');
 });
 
+test('offer to a guest: non-member placeholder, SMS to guest, LINE to club, no credit involved', function () {
+    t_clock(T_NOW); t_sms(); t_line();
+    $g = t_guest(['guest_name' => 'Ping', 'member_phone' => '0829419535']);
+    $wg = t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE,
+                      'waitlist_note' => 'Ping,ping@x.com,0829419535,Individual,,0']);
+
+    $offer = lsc_waitlist_offer_slot(t_pdo(), 2, T_DATE, '7-8am');
+
+    assert_true($offer !== null, 'guest offered');
+    assert_eq('guest', $offer['kind']);
+    assert_eq($g, $offer['non_member_id']);
+    assert_eq(660, $offer['price']);
+    $bk = t_row('bookings', 'id = ?', [$offer['booking_id']]);
+    assert_eq('non-member', $bk['booking_type']);
+    assert_eq(90002, $bk['member_id']);
+    assert_eq($g, $bk['non_member_id']);
+    assert_eq('Not paid yet', $bk['payment_remark']);
+    assert_eq('waitlist-reserved', $bk['booking_note']);
+    assert_true(str_starts_with((string) $bk['non_member_info'], 'Ping,'), 'guest info carried onto the booking');
+    assert_eq('pending', t_row('wait_list', 'wait_list_id = ?', [$wg])['waitlist_status']);
+    $sms = t_sms();
+    assert_eq(1, count($sms));
+    assert_eq('0829419535', $sms[0][0]);
+    assert_true(str_contains($sms[0][1], 'staff will contact you'), 'guest told staff will confirm');
+    $line = t_line();
+    assert_eq(1, count($line), 'club notified by LINE');
+    assert_true(str_contains($line[0], 'Ping') && str_contains($line[0], '660'), 'LINE names guest and price');
+});
+
+test('queue is fair across members and guests: oldest entry wins', function () {
+    t_clock(T_NOW);
+    $g = t_guest();
+    $m = t_member();
+    t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE, 'waitlist_note' => 'G,,,Individual,,0']);
+    t_waitlist(['member_id' => $m, 'date' => T_DATE]);
+    $offer = lsc_waitlist_offer_slot(t_pdo(), 1, T_DATE, '7-8am');
+    assert_eq('guest', $offer['kind'], 'guest joined first, guest is offered first');
+});
+
+test('guest offer: member or guest cannot confirm, only admin', function () {
+    t_clock(T_NOW);
+    $g = t_guest();
+    $wg = t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE, 'waitlist_note' => 'G,,,Individual,,0']);
+    lsc_waitlist_offer_slot(t_pdo(), 1, T_DATE, '7-8am');
+    assert_eq('admin_only', lsc_waitlist_confirm(t_pdo(), $wg, ['non_member_id' => $g])['reason'], 'guest self-confirm blocked');
+    assert_eq('admin_only', lsc_waitlist_confirm(t_pdo(), $wg, ['member_id' => t_member()])['reason'], 'member blocked');
+    assert_eq('pending', t_row('wait_list', 'wait_list_id = ?', [$wg])['waitlist_status']);
+});
+
+test('admin confirms a guest offer with bank transfer: booking paid, ledger typed non member, no credit touched', function () {
+    t_clock(T_NOW);
+    $admin = t_member(['member_type' => 'admin', 'credit' => 0]);
+    $g = t_guest();
+    $wg = t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE, 'timeslot' => '8-9pm',
+                      'waitlist_note' => 'Kat,k@x.com,065,Couple,Assistant coach,1']);
+    $offer = lsc_waitlist_offer_slot(t_pdo(), 5, T_DATE, '8-9pm');
+
+    $r = lsc_waitlist_confirm(t_pdo(), $wg, ['member_id' => $admin, 'is_admin' => true, 'payment' => 'qr']);
+
+    assert_true($r['ok']);
+    assert_eq('guest', $r['kind']);
+    assert_eq(280 + 800 + 750 + 200, $r['amount']);
+    assert_eq('qr', $r['payment']);
+    $bk = t_row('bookings', 'id = ?', [$offer['booking_id']]);
+    assert_eq('qr', $bk['payment']);
+    assert_null($bk['payment_remark']);
+    assert_eq('approved', $bk['booking_status']);
+    assert_eq('confirmed', t_row('wait_list', 'wait_list_id = ?', [$wg])['waitlist_status']);
+    $tx = t_rows('transactions', "non_member_id = ? AND transaction_type = 'booking (non member)' AND payment_type = 'qr' AND transaction_amount = ?", [$g, 2030]);
+    assert_eq(2, count($tx), 'both ledger rows promoted');
+    assert_eq(0, t_credit($admin), 'admin credit untouched');
+});
+
+test('guest can decline own offer; next member is offered', function () {
+    t_clock(T_NOW); t_sms();
+    $g = t_guest();
+    $m = t_member(['member_phone' => '0822222222']);
+    $wg = t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE, 'waitlist_note' => 'G,,,Individual,,0']);
+    $wm = t_waitlist(['member_id' => $m, 'date' => T_DATE]);
+    $offer = lsc_waitlist_offer_slot(t_pdo(), 1, T_DATE, '7-8am');
+    t_sms();
+    assert_eq('forbidden', lsc_waitlist_decline(t_pdo(), $wg, ['non_member_id' => $g + 1])['reason'], 'another guest cannot decline');
+    $r = lsc_waitlist_decline(t_pdo(), $wg, ['non_member_id' => $g]);
+    assert_true($r['ok']);
+    assert_eq('declined', t_row('wait_list', 'wait_list_id = ?', [$wg])['waitlist_status']);
+    assert_eq('cancelled', t_row('bookings', 'id = ?', [$offer['booking_id']])['booking_status']);
+    assert_eq('member', $r['next']['kind']);
+    assert_eq('pending', t_row('wait_list', 'wait_list_id = ?', [$wm])['waitlist_status']);
+    assert_eq('0822222222', t_sms()[0][0]);
+});
+
+test('pending_offers lists guest offers flagged for admin with price and expiry', function () {
+    t_clock(T_NOW);
+    $g = t_guest(['guest_name' => 'Ping']);
+    t_waitlist(['member_id' => 90002, 'non_member_id' => $g, 'member_type' => 'non-member', 'date' => T_DATE, 'waitlist_note' => 'Ping,,,Individual,,0']);
+    lsc_waitlist_offer_slot(t_pdo(), 1, T_DATE, '7-8am');
+    $list = lsc_waitlist_pending_offers(t_pdo());
+    assert_eq(1, count($list));
+    assert_true($list[0]['is_guest']);
+    assert_eq('Ping', $list[0]['person']['name']);
+    assert_eq(660, $list[0]['price']);
+    assert_eq('2026-10-05 10:00:00', $list[0]['expires_at']);
+    assert_eq(1, lsc_waitlist_pending_guest_count(t_pdo()));
+});
 /* ---------------- confirm ---------------- */
 
 test('confirm by member deducts the price from the member', function () {

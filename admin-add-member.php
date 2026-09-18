@@ -1,7 +1,7 @@
 <?php
 // Database connection
 require 'config.php';
-include 'includes/member-functions.php';
+include_once 'includes/member-functions.php';
 $member_id = $_GET['member_id'];
 ?>
 

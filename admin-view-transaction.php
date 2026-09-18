@@ -1,7 +1,7 @@
 <?php
 // Database connection
 require 'config.php';
-include 'includes/member-functions.php';
+include_once 'includes/member-functions.php';
 
 $transaction_id = $_GET['transaction_id'];
 ?>

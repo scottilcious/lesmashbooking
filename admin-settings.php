@@ -1,6 +1,6 @@
 <?php
 require 'config.php';
-include 'includes/booking-functions.php';
+include_once 'includes/booking-functions.php';
 ?>
 
 <!DOCTYPE html>

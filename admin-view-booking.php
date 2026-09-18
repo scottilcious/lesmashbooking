@@ -1,7 +1,8 @@
 <?php
+ob_start(); // allows redirects after the header has been rendered
 // Database connection
 require 'config.php';
-include 'includes/member-functions.php';
+include_once 'includes/member-functions.php';
 
 $booking_id = $_GET['booking_id'];
 $mark_as_paid = $_GET['mark_as_paid'];
@@ -212,14 +213,17 @@ function get_admin_booking_date_compare($date, $timeslot){
     // Waitlist offer actions taken by the admin on behalf of the member
     $waitlist_action = $_GET['waitlist_action'] ?? '';   // confirm | decline
     $waitlist_id     = (int) ($_GET['waitlist_id'] ?? 0);
-    $waitlist_notice = null;
+    $waitlist_notice = $_SESSION['lsc_flash'] ?? null;
+    unset($_SESSION['lsc_flash']);
 
     if ($memberType === 'admin' && $waitlist_id > 0 && in_array($waitlist_action, ['confirm', 'decline'], true)) {
-        $actor = ['member_id' => (int) $userId, 'is_admin' => true];
+        $actor = ['member_id' => (int) $userId, 'is_admin' => true, 'payment' => $_GET['payment'] ?? 'cash'];
 
         if ($waitlist_action === 'confirm') {
             $r = lsc_waitlist_confirm($pdo, $waitlist_id, $actor);
-            if ($r['ok']) {
+            if ($r['ok'] && $r['kind'] === 'guest') {
+                $waitlist_notice = ['success', 'Guest booking confirmed as paid by <b>' . ($r['payment'] === 'qr' ? 'bank transfer' : 'cash') . '</b>, <b>' . number_format($r['amount']) . ' THB</b>.'];
+            } elseif ($r['ok']) {
                 $waitlist_notice = ['success', 'This booking has been confirmed. <b>' . number_format($r['amount']) . ' THB</b> was deducted from member ID ' . (int) $r['member_id'] . '.'];
             } else {
                 switch ($r['reason']) {
@@ -236,17 +240,18 @@ function get_admin_booking_date_compare($date, $timeslot){
         } else {
             $r = lsc_waitlist_decline($pdo, $waitlist_id, $actor, 'declined');
             if ($r['ok']) {
-                $next = $r['next'] ? ' The court has been offered to member ID ' . (int) $r['next']['member_id'] . '.' : ' Nobody else is waiting for this slot; the court is now free.';
+                $next = $r['next'] ? ' The court has been offered to ' . $r['next']['kind'] . ' ' . htmlspecialchars($r['next']['name']) . '.' : ' Nobody else is waiting for this slot; the court is now free.';
                 $waitlist_notice = ['secondary', 'Offer declined on behalf of the member. No credit was deducted.' . $next];
             } else {
                 $waitlist_notice = ['danger', 'Could not decline this offer (status: ' . htmlspecialchars((string) ($r['status'] ?? $r['reason'])) . ').'];
             }
         }
 
-        // Re-read the booking so the page reflects the new state
-        $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
-        $stmt->execute([$booking_id]);
-        $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Redirect so a refresh does not repeat the action and the header badge is current
+        $_SESSION['lsc_flash'] = $waitlist_notice;
+        ob_end_clean();
+        header('Location: admin-view-booking.php?booking_id=' . (int) $booking_id);
+        exit;
     }
 
     if ($waitlist_notice): ?>
@@ -427,12 +432,23 @@ function get_admin_booking_date_compare($date, $timeslot){
                     <div class="alert alert-warning rounded-bottom-0" role="alert">
                         <div class="row justify-content-between">
                             <div class="col-auto">
-                                <h4>This booking is a reservation for a waitlist.</h4>
-                                Member has not confirmed this booking yet. Offer sent <?= htmlspecialchars((string) $waitlist['updated_at']) ?>; it expires 2 hours later.
+                                <?php $wl_is_guest = lsc_waitlist_is_guest_entry($waitlist); $wl_price = lsc_waitlist_total_price($waitlist['timeslot'], $waitlist['waitlist_note'], $wl_is_guest); ?>
+                                <h4>This booking is a reservation for a waitlist<?= $wl_is_guest ? ' (guest)' : '' ?>.</h4>
+                                <?php if ($wl_is_guest): ?>
+                                    <b>Only an admin can confirm a guest offer.</b> Collect <?= number_format($wl_price) ?> THB from the guest, then confirm with the payment method used.
+                                <?php else: ?>
+                                    Member has not confirmed this booking yet.
+                                <?php endif; ?>
+                                Offer sent <?= htmlspecialchars((string) $waitlist['updated_at']) ?>; it expires 2 hours later.
                             </div>
                             <div class="col-auto">
-                                <a class="btn btn-outline-dark" id="reserveMarkExpiredBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=decline&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Decline this offer for the member? The court will go to the next member on the waitlist.')">Decline Offer</a>
-                                <a class="btn btn-primary" id="reserveConfirmBookingBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=confirm&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Confirm this booking and deduct <?= number_format(lsc_waitlist_total_price($waitlist['timeslot'], $waitlist['waitlist_note'])) ?> THB from the member\'s credit?')">Confirm Booking (<?= number_format(lsc_waitlist_total_price($waitlist['timeslot'], $waitlist['waitlist_note'])) ?> THB)</a>
+                                <a class="btn btn-outline-dark" id="reserveMarkExpiredBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=decline&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Decline this offer? The court will go to the next person on the waitlist.')">Decline Offer</a>
+                                <?php if ($wl_is_guest): ?>
+                                    <a class="btn btn-success" id="reserveConfirmCashBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=confirm&payment=cash&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Confirm this guest booking as PAID IN CASH (<?= number_format($wl_price) ?> THB)?')">Confirm - paid cash (<?= number_format($wl_price) ?> THB)</a>
+                                    <a class="btn btn-outline-success" id="reserveConfirmQrBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=confirm&payment=qr&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Confirm this guest booking as PAID BY BANK TRANSFER (<?= number_format($wl_price) ?> THB)?')">Confirm - paid by transfer</a>
+                                <?php else: ?>
+                                    <a class="btn btn-primary" id="reserveConfirmBookingBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=confirm&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Confirm this booking and deduct <?= number_format($wl_price) ?> THB from the member\'s credit?')">Confirm Booking (<?= number_format($wl_price) ?> THB)</a>
+                                <?php endif; ?>
                             </div>
                         </div>
                         

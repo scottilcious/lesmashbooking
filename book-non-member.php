@@ -2,7 +2,7 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
-    include 'includes/booking-functions.php';
+    include_once 'includes/booking-functions.php';
 
     if (!lsc_is_booking_window_open_for_member('non-member')) {
         lsc_render_booking_window_closed_message('index.php');
