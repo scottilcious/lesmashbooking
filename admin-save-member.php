@@ -1,0 +1,93 @@
+<?php
+session_start();
+require 'config.php';
+
+if (!isset($_SESSION["user_id"])) {
+    die("Unauthorized access.");
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $member_id = $_POST["member_id"];
+
+    if( $_POST["action"] ){
+        $action = $_POST["action"];
+    }else{
+        $action = '';
+    }
+
+    if( $action == 'delete'){
+
+        $stmt = $pdo->prepare("DELETE FROM members WHERE id = ?");
+        $result = $stmt->execute([$member_id]);
+
+    }else{
+
+        
+        $member_number = $_POST['member_number'];
+        $first_name = $_POST["first_name"];
+        $last_name = $_POST["last_name"];
+        $member_type = $_POST["member_type"];
+        $member_status = $_POST["member_status"];
+        $member_phone = $_POST["member_phone"];
+        $member_email = $_POST["member_email"];
+        $member_since = $_POST["member_since"];
+        $member_length = $_POST["member_length"];
+        $member_expiration = $_POST["member_expiration"];
+        $last_renewed = $_POST["last_renewed"];
+        /*$new_price = $_POST["new_price"];
+        $discount = $_POST["discount"]; */
+        $credit = $_POST["credit"];
+        $member_note = $_POST["member_note"];
+        $member_password = $_POST["member_password"];
+
+
+         // Ensure the booking belongs to the logged-in user
+         $stmt = $pdo->prepare("UPDATE members SET member_number = ?,
+         first_name= ?, last_name = ?, member_type = ?, member_status = ?, member_phone = ?, member_email = ?, member_since = ?, member_length = ?, member_expiration = ?, last_renewed = ?, credit = ?, member_password =?, member_note =?
+         WHERE id = ?");
+         $result = $stmt->execute([$member_number, $first_name, $last_name, $member_type, $member_status, $member_phone, $member_email, $member_since, $member_length, $member_expiration, $last_renewed, $credit, $member_password,  $member_note, $member_id]);
+
+     }
+ 
+?>
+    <?php if( $result && $action == '' ): ?>
+
+        <div class="success-message text-center text-success">
+            <span class="fs-2">
+                <i class="ri-checkbox-circle-line"></i>
+            </span>
+            <br>
+            <p>Member has been saved successfully</p>
+            <a href="admin-view-member.php?member_id=<?php echo $member_id; ?>" class="btn btn-outline-primary">View member</a>
+            <a href="admin-members.php" class="btn btn-primary">View all members</a>
+        </div>
+
+    <?php elseif( $result && $action == 'delete' ): ?>
+
+        <div class="success-message text-center text-success">
+            <span class="fs-2">
+                <i class="ri-checkbox-circle-line"></i>
+            </span>
+            <br>
+            <p>Member deleted successfully</p>
+            <a href="admin-members.php" class="btn btn-primary">View all members</a>
+        </div>
+
+    <?php else: ?>
+
+        <div class="error-message text-center text-danger">
+            <span class="fs-2">
+                <i class="ri-error-warning-fill"></i>
+            </span>
+            <br>
+            <p>There's something wrong with the booking. Please try again.</p>
+            <hr>
+            <a href="admin-view-member.php?member_id=<?php echo $member_id; ?>" class="btn btn-primary">Try again</a>
+        </div>
+
+    <?php endif; ?>
+
+<?php 
+}
+?>

@@ -1,0 +1,5 @@
+logs/
+uploads/
+*.sql
+.DS_Store
+config.local.php

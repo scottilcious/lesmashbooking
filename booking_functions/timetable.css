@@ -1,0 +1,8 @@
+.total-court-hour{
+    width: 50%;
+}
+
+.total-court-hour input[type="number"]{
+    width: 40px;
+    text-align: center;
+}

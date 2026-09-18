@@ -1,0 +1,718 @@
+body{
+    font-family: "Barlow Condensed", serif;
+    font-size: 16px;
+    height: 100%;
+    margin: 0;
+    color: #00003E;
+}
+
+a{
+    color: #02679b;
+}
+
+a:hover{
+    color: rgba(2, 103, 155, 0.85);
+}
+
+
+.image-side {
+    background: url('images/hero-login.jpg') no-repeat center center;
+    background-size: cover;
+    height: 100%;
+    position: relative;
+}
+
+.image-title {
+    position: absolute;
+    top: 0;
+    left: 0%;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.image-title h1{
+    color: white;
+    font-size: 2rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.image-side img{
+    margin-right: 16px;
+}
+
+
+.form-side {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f8f9fa;
+    padding: 40px;
+}
+.form-container {
+    width: 100%;
+    max-width: 400px;
+}
+.form-container h1 {
+    margin-bottom: 20px;
+}
+
+.container-register .image-side,
+.container-register .form-side{
+    min-height: 100vh;
+}
+
+.container-register .image-side .image-title{
+    height: 100%;
+}
+
+
+.main-nav{
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.main-nav a{
+    color: #00003E;
+    position: relative;
+    padding: 12px 8px;
+    text-decoration: none;
+    font-size: 1.2em;
+    transition: 0.5s;
+    border-right: 1px solid rgba(1, 1, 1, 0.05);
+}
+
+.main-nav a::after{
+    position: absolute;
+    bottom: 0px;
+    left: 45%;
+    width: 10%;
+    content: "";
+    height: 2px;
+    opacity: 0;
+    transition: 0.5s;
+}
+
+body.page-id-1 .main-nav a.page-id-1,
+body.page-id-2 .main-nav a.page-id-2,
+body.page-id-3 .main-nav a.page-id-3,
+body.page-id-4 .main-nav a.page-id-4,
+body.page-id-5 .main-nav a.page-id-5,
+body.page-id-6 .main-nav a.page-id-6,
+body.page-id-7 .main-nav a.page-id-7,
+.main-nav a:hover{
+    color: #02679b;
+}
+
+
+body.page-id-1 .main-nav a.page-id-1::after,
+body.page-id-2 .main-nav a.page-id-2::after,
+body.page-id-3 .main-nav a.page-id-3::after,
+body.page-id-4 .main-nav a.page-id-4::after,
+body.page-id-5 .main-nav a.page-id-5::after,
+body.page-id-6 .main-nav a.page-id-6::after,
+body.page-id-7 .main-nav a.page-id-7::after,
+.main-nav a:hover::after{
+    position: absolute;
+    bottom: 0px;
+    left: 30%;
+    width: 40%;
+    content: "";
+    height: 2px;
+    background-color: #8AC901;
+    opacity: 1;
+}
+
+.banner{
+    background: url(images/hero.jpg) no-repeat center center;
+    background-size: 100%;
+    padding: 32px 0px;
+}
+
+.booking-section{
+    background: url(images/banner.jpg) no-repeat center top;
+    background-size: 100%;
+    padding-top: 300px;
+}
+
+.court-select-wrapper{
+    padding: 3em;
+    background-color: rgba(1, 1, 1, 0.01);
+    border: 1px solid rgba(1, 1, 1, 0.05);
+    border-radius: 8px;
+}
+
+.court-select-wrapper.checked{
+    background-color: rgba(138, 201, 1, 0.2);
+    border: 2px solid rgb(138, 201, 1);
+}
+
+.boooking-time-slot-wrapper,
+.row-time-slot label{
+    padding: 1em;
+    background-color: white;
+    border: 1px solid rgba(1, 1, 1, 0.05);
+    width: 100%;
+    min-height: 100px;
+}
+
+.boooking-time-slot-wrapper:hover,
+.row-time-slot label:hover{
+    background-color: rgb(217, 226, 223);
+}
+
+.boooking-time-slot-wrapper.checked{
+    background-color: white;
+    border: 2px solid rgb(138, 201, 1);
+}
+
+.boooking-time-slot-wrapper.disabled{
+    position: relative;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.boooking-time-slot-wrapper input[type="radio"]:disabled,
+.disabled-label{
+    cursor: not-allowed;
+}
+
+.disabled-label:hover{
+    background-color: white;
+}
+
+.disabled-label{
+    opacity: 0.6;
+}
+
+.badge-member{
+    text-align: center;
+    padding: 2px;
+    background-color: rgb(127, 200, 255);
+    color: rgb(28, 67, 54);
+    border-radius: 4px;
+}
+
+.badge-member.none{
+    display: none;
+}
+
+.card-booking{
+    position: relative;
+}
+
+.card-booking .loader-wrapper{
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(1, 1, 1, 0.6);
+}
+
+.box-shadow{
+    box-shadow: 0px 5px 15px rgba(1, 1, 1, 0.1);
+}
+
+.all-booking-section{
+    padding-top: 200px;
+    background: url(images/hero.jpg) no-repeat top center;
+    background-size: 100%;
+}
+
+.booking_time_slots,
+.payment_options{
+    display: none;
+}
+
+.booking_time_slots.display,
+.payment_options.display{
+    display: block;
+}
+
+.row-time-slot{
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border: 1px solid rgba(1, 1, 1, 0.1);
+    background-color: rgba(1, 1, 1, 0.05);
+}
+
+.row-time-slot .col-time-slot{
+    width: 16.66%;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+.booking-validate-alert{
+    display: none;
+}
+
+.booking-validate-alert.display{
+    display: block;
+}
+
+@media (min-width: 992px) {
+    body.page-id-1 .flatpickr-calendar {
+        width: 360px;
+        font-size: 1.05rem;
+    }
+
+    body.page-id-1 .flatpickr-months .flatpickr-month {
+        height: 52px;
+    }
+
+    body.page-id-1 .flatpickr-current-month {
+        font-size: 1.2rem;
+        padding-top: 8px;
+    }
+
+    body.page-id-1 .flatpickr-weekdays {
+        height: 40px;
+    }
+
+    body.page-id-1 span.flatpickr-weekday {
+        font-size: 1rem;
+        line-height: 40px;
+    }
+
+    body.page-id-1 .flatpickr-day {
+        max-width: none;
+        height: 44px;
+        line-height: 44px;
+        font-size: 1.05rem;
+    }
+
+    body.page-id-1 .dayContainer,
+    body.page-id-1 .flatpickr-days {
+        width: 360px;
+        min-width: 360px;
+        max-width: 360px;
+    }
+}
+
+
+
+.payment-options-wrapper.display{
+    display: block;
+}
+
+
+.paymen-selection-wrapper .payment label{
+    font-size: 1.3em;
+}
+
+.paymen-selection-wrapper .payment.active{
+    background-color: rgb(127, 200, 255,0.1);
+}
+
+
+.loader-overlay{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    background-color: rgba(1, 1, 1, 0.6);
+}
+
+.loader-overlay.display{
+    display: block;
+}
+
+.loader-overlay .inner-loader{
+    border-radius: 20px;
+    padding: 2em;
+}
+
+
+th.sortable{
+    cursor: n-resize;
+}
+
+.member-detail-card{
+    display: none;
+}
+
+.member-detail-card.display{
+    display: block;
+}
+
+.table-court-timeslot .time-slot-court{
+    padding: 12px;
+    text-align: center;
+}
+
+.table-court-timeslot .court-time-booked{
+    background-color: #eb564f;
+    color: white;
+    border: 1px solid #eb564f;
+}
+
+.table-court-timeslot .court-time-booked.academy{
+    background-color: #ee7e31;
+    color: #11243e;
+    border: 1px solid #ee7e31;
+}
+
+.table-court-timeslot .available-court-time{
+    background-color: #ddf6c7;
+    color: #2c671d;
+    border: 1px solid #58bb60;
+}
+
+.table-court-timeslot .peak-time-weekday,
+.table-court-timeslot .peak-time-weekend{
+    background-color: rgb(207, 207, 207);
+    color: #777;
+    border: 1px solid rgba(0, 0, 0, 0.2)
+}
+
+.make-a-booking-section.active{
+    display: block;
+}
+
+.credit-notice-wrapper.hide-panel,
+.search-member-result.hide-panel,
+.upload-slip-wrapper,
+.search-member-panel{
+    display: none;
+}
+
+.credit-notice-wrapper.display,
+.search-member-result.display,
+.upload-slip-wrapper.display,
+.search-member-panel.display{
+    display: block;
+}
+
+.all-booking-list .table-court-timeslot .court-time-booked:hover{
+    background-color: rgb(160, 19, 19);
+}
+
+.all-booking-list .table-court-timeslot .court-time-booked a{
+    color: white;
+}
+
+.card-shadow-large{
+    box-shadow:  50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
+}
+
+.booking-summary-body .booking-summary-list{
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px dotted rgba(1, 1, 1, 0.05);
+}
+
+.booking-summary-body .booking-summary-list p{
+    margin-bottom: 0px;
+    padding-bottom: 0px;
+}
+
+.booking-summary-body .booking-summary-fee {
+    background-color: #f6f9fc;
+    padding: 1em;
+    border: 1px solid #d9dfe7;
+    border-radius: 12px;
+}
+
+.payment-option-wrapper{
+    border: 1px solid rgba(1, 1, 1, 0.05);
+    border-radius: 8px;
+}
+
+.payment-option-wrapper .paymention-option{
+    border-bottom: 1px solid rgba(1, 1, 1, 0.05);
+}
+
+
+.payment-option-wrapper .paymention-option:hover{
+    background-color: #f6f9fc;
+}
+
+.payment-option-wrapper .paymention-option:last-child{
+    border-bottom: 0px;
+}
+
+.payment-option-wrapper .paymention-option .paymention-accordion-title{
+    padding: 8px 1em;
+}
+
+.payment-option-wrapper .paymention-option .paymention-accordion-title.active{
+    border-bottom: 1px solid rgba(1, 1, 1, 0.05);
+}
+
+.payment-option-wrapper .paymention-option .payment-accordion-content{
+    display: none;
+    padding: 8px 1em;
+}
+
+.payment-option-wrapper .paymention-option .payment-accordion-content.active,
+.payment-option-wrapper .paymention-option .payment-accordion-content.always-active{
+    display: block;
+}
+
+.payment-option-wrapper .paymention-option.hide{
+    display: none;
+}
+
+.remaining-credit-badge{
+    background-color: #8AC901;
+    color: #00003E;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.table-time-table td{
+    padding: 0px 0px;
+}
+
+.table-time-table td a{
+    color: white;
+}
+
+.table-time-table td label,
+.table-time-table td.timeslot-column{
+    padding: 0.5em;
+}
+
+.table-time-table td label.available-slot,
+.table-time-table td .available-slot{
+    min-height: 100px;
+    background-color: #ddf6c7;
+    color: #2c671d;
+    border: 1px solid #58bb60;
+    width: 100%;
+}
+
+.table-time-table td div.available-slot{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.available-slot.waitlist-slot{
+    background-color: #7ebfff !important;
+    color: #273b4e !important;
+    border: 1px solid #273b4e !important;
+}
+
+.table-time-table td .booked{
+    min-height: 100px;
+    width: 100%;
+    background-color: #eb564f;
+    color: white;
+    border: 1px solid #eb564f;
+    text-align: center;
+    padding: 0.5em;
+}
+
+
+.table-time-table .booked.not_paid,
+.table-time-table .booked.Not_paid_yet{
+    min-height: 100px;
+    width: 100%;
+    background-color: #68009f !important;
+    color: white !important;
+    border: 1px solid #68009f !important;
+    text-align: center;
+    padding: 0.5em;
+}
+
+.table-time-table td .booked-academy{
+    min-height: 100px;
+    width: 100%;
+    background-color: #ee7e31;
+    color: white;
+    border: 1px solid #ee7e31;
+    text-align: center;
+    padding: 0.5em;
+}
+
+.table-time-table td .peak-time-available{
+    min-height: 100px;
+    width: 100%;
+    background-color: #e6e6e6;
+    color: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(0,0,0,0.5);
+    text-align: center;
+    padding: 0.5em;
+}
+
+.member-type-view-admin td > label,
+.member-type-view-admin td > div,
+.admin-view-all-bookings-table td > label,
+.admin-view-all-bookings-table td > div{
+    min-height: 120px !important;
+}
+
+.admin-view-all-bookings-table td > label a,
+.admin-view-all-bookings-table td > div a{
+    color: white !important;
+}
+
+.admin-view-all-bookings-table td > label a.waitlist-link,
+.admin-view-all-bookings-table td > div a.waitlist-link{
+    color: #00003E !important;
+}
+
+.admin-invisible{
+    overflow: hidden;
+    height: 1px;
+    opacity: 0;
+}
+
+
+.member_daily_booking_fee_form{
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.daily-member-selection-wrapper.non-selection{
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+
+.coach-extra-player-wrapper{
+    display: none;
+}
+
+.coach-extra-player-wrapper.active{
+    display: block;
+}
+
+.date-input-group{
+    position: relative;
+}
+
+.date-input-group input{
+    padding-left: 44px;
+}
+
+.date-input-group .date-icon{
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 32px;
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+}
+
+.paymention-option.payment-credit.admin.non-member,
+.paymention-option.payment-credit.non-member{
+    display: none;
+}
+
+
+.member-expire-true td{
+    background-color: rgb(255, 247, 227) !important;
+}
+
+.selectTimeCourt-section table tr th,
+.selectTimeCourt-section table tr td,
+.admin-view-all-bookings-table tr th,
+.admin-view-all-bookings-table tr td {
+    width: 100px;
+}
+
+#allMemberTable th a{
+    color: white !important;
+}
+
+
+.transaction_id_main td{
+    background-color: rgb(255, 255, 255) !important;
+    border-bottom: 2px solid gb(255, 247, 227) !important;
+    font-weight: bold;
+}
+
+.transaction_id_children td{
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+
+.booking-container-not_booking_time{
+    display: none;
+}
+
+.cancelled-transaction td{
+    background-color: rgb(255, 220, 220) !important;
+}
+
+
+.cancelled-transaction td{
+    background-color: rgb(255, 243, 243) !important;
+}
+
+tr.transaction-type-cancelled td{
+    background-color: rgb(255, 243, 243) !important;
+}
+
+tr.transaction-type-booking td{
+    background-color: rgb(245, 252, 250) !important;
+}
+
+tr.transaction-type-credit-refill td{
+    background-color: rgb(240, 247, 255) !important;
+}
+
+tr.transaction-type-credit-refill-approved td{
+    background-color: rgb(241, 254, 255) !important;
+}
+
+.table-time-table td .booked.cancelled-rain-booking{
+    background-color: #cdcdcd;
+    border: 1px solid #a3a3a3;
+    text-align: center;
+}
+
+.table-time-table td .booked.cancelled-rain-booking,
+.table-time-table td .booked.cancelled-rain-booking a{
+    color: black !important;
+}
+
+
+
+.btn.btn-cancel{
+    background-color: rgb(255, 145, 0);
+    border: 1px solid rgb(255, 145, 0);
+    color: black;
+}
+
+.btn.btn-cancel:hover{
+    background-color: rgb(255, 167, 52);
+    border: 1px solid rgb(255, 167, 52);
+}
+
+.btn.btn-outline-cancel{
+    background-color: transparent;
+    border: 1px solid rgb(255, 145, 0);
+    color: rgb(107, 61, 0);
+}
+
+.btn.btn-outline-cancel:hover{
+    background-color: rgb(255, 167, 52);
+    border: 1px solid rgb(255, 167, 52);
+}
