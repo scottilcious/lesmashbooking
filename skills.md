@@ -62,6 +62,13 @@ Two hardcoded arrays, `$court_exempt_dates` and `$court_closed_dates`, exist in 
 - Add a case in `get_admin_booking_type()` in `modules/time-table.php` and `check_availability.php`.
 - Add the radio in `modules/admin-booking-menu.php`.
 
+## Approve a credit refill (how it works)
+
+`check_member_credit.php` renders the approval panel inside `admin-view-transaction.php`; the admin may edit
+`approved_amount`. `admin-approve-credit.php` locks the transaction row, requires `transaction_type = 'Credit refill'`,
+flips it to `Credit refill - Approved` with the approved amount, and does `credit = credit + amount`. A second
+approval returns 409. Never write an absolute balance.
+
 ## Trace a booking's money
 
 ```sql

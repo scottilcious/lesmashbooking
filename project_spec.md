@@ -88,13 +88,13 @@ Key/value. Only key today: `allow_midnight_booking`.
 - Credit payment: instant approval, balance reduced immediately.
 - Bank transfer / QR: booking is "pending" with an uploaded slip (resized to max 1000px) until an admin approves it on the booking detail page.
 - Admin cash bookings are approved immediately and may be flagged "Not paid yet".
-- Credit refill: member uploads a slip, a `Credit refill` transaction is created and LINE notified; admin approves, which sets the new balance and marks the transaction approved.
+- Credit refill: member uploads a slip, a `Credit refill` transaction is created and LINE notified; admin approves from the transaction page, optionally adjusting the amount to match the slip. Approval **adds** the amount to the current balance atomically and can only happen once per refill.
+- Admin "Save changes" on a booking edits court, date, time, status, coach and note only. It refuses to set "cancelled" (the Cancel buttons handle refunds and the waitlist) and refuses to move a booking onto an occupied court.
 
 ### Cancellation and refunds
 - Member self-cancel: full refund to credit only if 48 hours or more before the slot start and the booking was paid by credit or QR. Guest fees refunded alongside. Otherwise no refund.
 - Guest self-cancel: never auto-refunded; told to contact admin.
 - Admin cancel: optional credit refund; "rain/pollution" option refunds full or half amount regardless of timing, and does not trigger waitlist promotion.
-- Admin "save booking" with status cancelled and refund flag adds the given credit back.
 
 ### Waitlist
 1. A member or guest ticks "Waitlist" on a slot; a `wait_list` row is created with NULL status. Payment option becomes "Pay at confirmation". For guests the note stores name, email, phone, daily type, coach and extra players.

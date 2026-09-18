@@ -851,7 +851,7 @@ function get_admin_booking_date_compare($date, $timeslot){
                             $(".loader-overlay .inner-loader").html(response);
                         },
                         error: function(xhr) {
-                            $(".loader-overlay .inner-loader").html("Error: " + xhr.statusText);
+                            $(".loader-overlay .inner-loader").html(xhr.responseText || ("Error: " + xhr.statusText));
                         }
                     });
                 }
@@ -889,7 +889,7 @@ function get_admin_booking_date_compare($date, $timeslot){
                             $(".loader-overlay .inner-loader").html(response);
                         },
                         error: function(xhr) {
-                            $(".loader-overlay .inner-loader").html("Error: " + xhr.statusText);
+                            $(".loader-overlay .inner-loader").html(xhr.responseText || ("Error: " + xhr.statusText));
                         }
                     });
                 }
@@ -926,7 +926,7 @@ function get_admin_booking_date_compare($date, $timeslot){
                             $(".loader-overlay .inner-loader").html(response);
                         },
                         error: function(xhr) {
-                            $(".loader-overlay .inner-loader").html("Error: " + xhr.statusText);
+                            $(".loader-overlay .inner-loader").html(xhr.responseText || ("Error: " + xhr.statusText));
                         }
                     });
                     
@@ -964,7 +964,7 @@ function get_admin_booking_date_compare($date, $timeslot){
                             $(".loader-overlay .inner-loader").html(response);
                         },
                         error: function(xhr) {
-                            $(".loader-overlay .inner-loader").html("Error: " + xhr.statusText);
+                            $(".loader-overlay .inner-loader").html(xhr.responseText || ("Error: " + xhr.statusText));
                         }
                     });
                     

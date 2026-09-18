@@ -79,16 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="border-bottom mb-2"><?= number_format($member_info[0]['credit'], 2, '.', ',') ?></p>
                 <span>Credit refilled</span>
                 <p class="fw-bold border-bottom border-2 text-success mb-2"><?= number_format($transaction_info[0]['transaction_amount'], 2, '.', ',') ?></p>
-                <span>Total final member credit</span>
-                <h4 class="fw-bold fs-3">
-                    <?php 
-                    $total_credit = $member_info[0]['credit'] + $transaction_info[0]['transaction_amount'];
-                    ?>
-                    <input type="number" id="total_credit" name="total_credit"
-                    value="<?= $total_credit ?>">
-                    <input type="hidden" name="add_credit_member_id" id="add_credit_member_id" value="<?= $member_id ?>">
-                    <input type="hidden" name="add_credit_transaction_id" id="add_credit_transaction_id" value="<?= $transaction_id ?>">
+                <?php if( $transaction_info[0]['transaction_type'] == 'Credit refill'){ ?>
+                <span>Amount to approve (edit if the slip differs)</span>
+                <div class="input-group mb-2">
+                    <input type="number" class="form-control" id="approved_amount" name="approved_amount" min="1" value="<?= (int) $transaction_info[0]['transaction_amount'] ?>">
+                    <span class="input-group-text">THB</span>
+                </div>
+                <?php } ?>
+                <span>Total after approval</span>
+                <h4 class="fw-bold fs-3" id="total_credit_preview">
+                    <?= number_format($member_info[0]['credit'] + $transaction_info[0]['transaction_amount'], 2) ?>
                 </h4>
+                <small class="text-body-secondary">The approved amount is added to the member's balance at the moment you click approve.</small>
+                <input type="hidden" name="add_credit_member_id" id="add_credit_member_id" value="<?= $member_id ?>">
+                <input type="hidden" name="add_credit_transaction_id" id="add_credit_transaction_id" value="<?= $transaction_id ?>">
                 <?php if( $transaction_info[0]['transaction_type'] == 'Credit refill'){ ?>
                     <span class="badge rounded-pill text-bg-light">Pending</span>
                 <button type="button" id="approveThisCredit" class="btn btn-secondary btn-lg">Approve Credit</button>
@@ -117,16 +121,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $('#approveThisCredit').click(function(){
 
-            let total_credit = $("#total_credit").val();
-            let add_credit_member_id = $("#add_credit_member_id").val();
+            let approved_amount = $("#approved_amount").val();
             let add_credit_transaction_id = $("#add_credit_transaction_id").val();
+            if (!confirm("Approve " + approved_amount + " THB credit for this member?")) { return; }
 
-            $.post("admin-approve-credit.php", { 
-                    total_credit: total_credit, 
-                    add_credit_member_id: add_credit_member_id, 
-                    add_credit_transaction_id: add_credit_transaction_id }, 
-            function (data) {
-                $('#transactionContent').html(data);
+            $.ajax({
+                url: "admin-approve-credit.php",
+                type: "POST",
+                data: { approved_amount: approved_amount, add_credit_transaction_id: add_credit_transaction_id },
+                complete: function (xhr) { $('#transactionContent').html(xhr.responseText); }
             });
 
         });
