@@ -5,8 +5,8 @@ Guidance for AI assistants working on this repository.
 ## What this is
 
 Le Smash Club tennis court booking system, live at https://booking.lesmashclub.com.
-Plain PHP 7/8 with PDO against a MariaDB database. No framework, no Composer, no build step,
-no tests. Files were pulled as-is from the production server on 2026-09-18. This is a legacy
+Plain PHP 7/8 with PDO against a MariaDB database. No framework, no Composer, no build step.
+A small dependency-free test suite lives in `tests/`. Files were pulled as-is from the production server on 2026-09-18. This is a legacy
 codebase; treat every change as a change to production.
 
 See `project_spec.md` for the functional specification and `skills.md` for task recipes.
@@ -15,7 +15,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 
 | Path | Purpose |
 |---|---|
-| `config.php` | PDO connection (`$pdo`) and `DISABLE_NOTIFICATIONS` flag |
+| `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
 | `includes/booking-functions.php` | Booking window, advance limit, per-type rules, refund eligibility, system settings |
 | `includes/member-functions.php` | Timeslot to time conversion, date helpers, expiry check |
@@ -25,13 +25,16 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 | `check_availability.php` | AJAX re-render of the grid for a chosen date, plus the client-side rule JS |
 | `book-member.php`, `book-non-member.php`, `book-admin-member.php`, `book-admin-non-member.php`, `book-academy.php` | Booking submit handlers, chosen by `app.js` |
 | `cancel_booking.php`, `admin-cancel-booking.php` | Cancellation, refunds, waitlist promotion |
-| `waitlist.php`, `booking_functions/dynamic-waitlist.php` | Waitlist confirm/expire and helper functions |
+| `includes/waitlist-service.php` | **The** waitlist implementation: offer, confirm, decline, expire (see header comment) |
+| `waitlist.php` | Member waitlist page; calls the service |
+| `cron/waitlist-expire.php` | CLI sweep for stale offers; run every 5 min |
+| `tests/` | `php tests/run.php` runs the suite against `DB_TEST_DATABASE` |
 | `admin-*.php` | Admin screens and AJAX handlers |
 | `app.js` | All shared front-end logic (grid selection, fee calc, submit routing, member search) |
 | `logs/app.log` | JSON-lines audit log written by `lsc_log()` (not committed) |
 | `uploads/` | Payment slip images (not committed) |
 
-Dead or superseded files: `book.php`, `booking-process.php`, `register.php`,
+Dead or superseded files: `booking_functions/dynamic-waitlist.php` (only `get_timeslot_for_waitlist`-style helpers remain in use by legacy pages; do not add to it), `book.php`, `booking-process.php`, `register.php`,
 `booking_functions/process_waitlist.php`, `booking_functions/confirm-waitlist.php`,
 `booking_functions/testsms.php`, `line-push.php`, `line-api.php`, `extend-membership.php`.
 Do not build on them.
@@ -50,9 +53,11 @@ Do not build on them.
 
 ## Rules for changes
 
+- Run `php tests/run.php` before committing. Add a test for every behaviour change in `includes/`.
+- Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script.
+- Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
-- Keep `date_default_timezone_set('Asia/Bangkok')` semantics; all times are club-local.
 - When touching booking or cancellation flows, wrap multi-statement writes in a PDO transaction.
 - Preserve the existing HTML fragment response shape for AJAX endpoints unless you also update the caller in `app.js`.
 - Log user-visible state changes through `lsc_log()`.

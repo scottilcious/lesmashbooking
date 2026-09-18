@@ -29,7 +29,7 @@ $delete_booking_action = $_GET['delete_action'];
 </head>
 <body>
     <?php include "menu.php"; 
-    include 'booking_functions/dynamic-waitlist.php';
+    // legacy booking_functions/dynamic-waitlist.php no longer needed here; waitlist logic lives in includes/waitlist-service.php
 
 function getWaitlistByBookingId(PDO $pdo, int $waitlist_booking_id)
 {
@@ -206,215 +206,54 @@ function get_admin_booking_date_compare($date, $timeslot){
         </div>
     </div>
 
-    <?php 
-    //Confirm booking 
-    $waitlist_confirm = $_GET['waitlist_confirm'];
-    $waitlist_id = $_GET['waitlist_id'];
-    $passed_date = $_GET['date'];
-    $passed_timeslot = $_GET['timeslot'];
-    $free_court = $_GET['free_court'];
-    $book_id = $_GET['book_id'];
-    $waitlist_member_id = $_GET['waitlist_member_id'];
+    <?php
+    require_once 'includes/waitlist-service.php';
 
-    if( $waitlist_member_id ){
-        $thisMemberCredit = $credit = getMemberCreditById($pdo, $waitlist_member_id);
-    }
-    
+    // Waitlist offer actions taken by the admin on behalf of the member
+    $waitlist_action = $_GET['waitlist_action'] ?? '';   // confirm | decline
+    $waitlist_id     = (int) ($_GET['waitlist_id'] ?? 0);
+    $waitlist_notice = null;
 
-    if( $waitlist_confirm == 'true' && $waitlist_id && $free_court && $passed_date &&  $passed_timeslot){
-        $waitlist_status = 'confirmed';
+    if ($memberType === 'admin' && $waitlist_id > 0 && in_array($waitlist_action, ['confirm', 'decline'], true)) {
+        $actor = ['member_id' => (int) $userId, 'is_admin' => true];
 
-        //Check credit
-        if($thisMemberCredit < 260){
-        ?>
-            <div class="container mt-3">
-            <div class="alert alert-warning" role="alert">
-                <h2>Not enough credit to confirm a booking</h2>
-                This member does not have enough credit to make a booking.<br>
-                Please refill credit before confirming the booking.
-                <hr>
-                <a href="admin-add-credit.php" class="btn btn-primary">Add Credit</a>
-            </div>
-            </div>
-        <?php 
-            
-            return false;
-        }
-
-        //Check if past grace period 
-        $formatted_time = get_timeslot_for_waitlist($passed_timeslot);
-        $diffSeconds = getTimeDifferenceFromNow($passed_date, $formatted_time);
-
-        // Check if it's less than 2 hours
-        if ($diffSeconds < 2 * 3600) {
-
-            //Update Waitlist to Expired
-            $waitlist_status = 'expired';
-            updateWaitlistStatus($pdo, $waitlist_id, $waitlist_status, $free_court);
-
-            $transactionId = getTransactionIdByBookingId($pdo, $book_id);
-            $assocId = getAssocTransactionId($pdo, $transactionId);
-
-            //Create cancelled transaction
-            $transactionData = [
-                'transaction_title'    => 'Cancelled from waitlist expiration',
-                'assoc_transaction_id' => null,       // or another txn ID if linked
-                'member_id'            => $userId,
-                'non_member_id'        => '90002',
-                'transaction_amount'   => 0,
-                'transaction_type'     => 'cancelled',  // or refund, credit_topup, etc.
-                'payment_type'         => 'credit',       // cash, qr, credit, etc.
-                'slip_url'             => null,
-                'transaction_note'     => 'cancelled by member',
-            ];
-
-            $txnId = createTransaction($pdo, $transactionData);
-
-            //Update booking status 
-            $newStatus = 'cancelled';
-            $updateBooking = updateBookingStatus($pdo, $book_id, $newStatus);
-
-            if( $txnId && $updateBooking ){
-                ?>
-                <div class="container mt-3">
-                    <div class="error-message text-center text-danger alert alert-danger" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-error-warning-fill"></i>
-                        </span>
-                        <br>
-                        <p>Unfortunately, the booking has been expired.<br>However, you can still make another booking.</p>
-                        <hr>
-                        <a href="index.php" class="btn btn-primary">Make a booking</a>
-                    </div>
-                </div>
-                <?php 
-            }else{
-                ?>
-                <div class="container mt-3">
-                    <div class="error-message text-center text-danger alert alert-danger" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-error-warning-fill"></i>
-                        </span>
-                        <br>
-                        <p>There's something wrong with the booking. Please try again.</p>
-                        <hr>
-                        <a href="waitlist.php" class="btn btn-primary">Try again</a>
-                    </div>
-                </div>
-                <?php 
-            }
-
-            
-        } else {
-            //Confirm booking
-            $payment = 'credit';
-            $payment_remark = NULL;
-            $booking_note = 'waitlist booking paid';
-
-            if (updateBookingPayment($pdo, $book_id, $payment, $payment_remark, $booking_note)) {
-                ?>
-                <div class="container mt-3">
-                    <div class="success-message text-center text-success alert alert-success" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-checkbox-circle-line"></i>
-                        </span>
-                        <br>
-                        <p>This booking has been confirmed!</p>
-                        <hr>
-                        <a href="admin-bookings.php" class="btn btn-primary">View all bookings</a>
-                    </div>
-                </div>
-                <?php 
+        if ($waitlist_action === 'confirm') {
+            $r = lsc_waitlist_confirm($pdo, $waitlist_id, $actor);
+            if ($r['ok']) {
+                $waitlist_notice = ['success', 'This booking has been confirmed. <b>' . number_format($r['amount']) . ' THB</b> was deducted from member ID ' . (int) $r['member_id'] . '.'];
             } else {
-                ?>
-                <div class="container mt-3">
-                    <div class="error-message text-center text-danger alert alert-danger" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-error-warning-fill"></i>
-                        </span>
-                        <br>
-                        <p>There's something wrong with the booking. Please try again.</p>
-                        <hr>
-                        <a href="admin-view-booking.php?booking_id=<?= $book_id ?>" class="btn btn-primary">Try again</a>
-                    </div>
-                </div>
-                <?php 
+                switch ($r['reason']) {
+                    case 'insufficient_credit':
+                        $waitlist_notice = ['warning', 'Not enough credit: this booking costs <b>' . number_format($r['required']) . ' THB</b> but the member has <b>' . number_format($r['credit']) . ' THB</b>. <a href="admin-add-credit.php" class="alert-link">Add credit</a> and confirm again.'];
+                        break;
+                    case 'expired':
+                        $waitlist_notice = ['danger', 'This offer has expired (2 hour window passed or the session is too close). The reservation was released and the court offered to the next member on the waitlist.'];
+                        break;
+                    default:
+                        $waitlist_notice = ['danger', 'This offer is no longer open (status: ' . htmlspecialchars((string) ($r['status'] ?? $r['reason'])) . ').'];
+                }
             }
-
-            //Update Waitlist status
-            $waitlist_status = 'confirmed';
-            updateWaitlistStatus($pdo, $waitlist_id, $waitlist_status, $free_court);
-
-            //Get pricing 
-            $this_transaction_price = getTransactionPrice($passed_timeslot);
-
-            //Reduce credit
-            $stmt_mb = $pdo->prepare("UPDATE members SET credit = credit - ? WHERE id = ? ");
-            $result_reduce_credit = $stmt_mb->execute([$this_transaction_price, $userId]);
+        } else {
+            $r = lsc_waitlist_decline($pdo, $waitlist_id, $actor, 'declined');
+            if ($r['ok']) {
+                $next = $r['next'] ? ' The court has been offered to member ID ' . (int) $r['next']['member_id'] . '.' : ' Nobody else is waiting for this slot; the court is now free.';
+                $waitlist_notice = ['secondary', 'Offer declined on behalf of the member. No credit was deducted.' . $next];
+            } else {
+                $waitlist_notice = ['danger', 'Could not decline this offer (status: ' . htmlspecialchars((string) ($r['status'] ?? $r['reason'])) . ').'];
+            }
         }
 
+        // Re-read the booking so the page reflects the new state
+        $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
+        $stmt->execute([$booking_id]);
+        $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-    }else if($waitlist_confirm == 'false' && $waitlist_id && $free_court && $passed_date &&  $passed_timeslot){
-        $waitlist_status = 'confirmed';
-        //Cancel Booking Confirmation
-
-        //Update Waitlist to Expired
-            $waitlist_status = 'expired';
-            updateWaitlistStatus($pdo, $waitlist_id, $waitlist_status, $free_court);
-
-            //Create cancelled transaction
-            $transactionData = [
-                'transaction_title'    => 'Cancelled from waitlist expiration',
-                'assoc_transaction_id' => null,       // or another txn ID if linked
-                'member_id'            => $userId,
-                'non_member_id'        => '90002',
-                'transaction_amount'   => 0,
-                'transaction_type'     => 'cancelled',  // or refund, credit_topup, etc.
-                'payment_type'         => 'credit',       // cash, qr, credit, etc.
-                'slip_url'             => null,
-                'transaction_note'     => 'cancelled by member',
-            ];
-
-            $txnId = createTransaction($pdo, $transactionData);
-
-            //Update booking status 
-            $newStatus = 'cancelled';
-            $updateBooking = updateBookingStatus($pdo, $book_id, $newStatus);
-
-            if( $txnId && $updateBooking ){
-                ?>
-                <div class="container mt-3">
-                    <div class="error-message text-center text-danger alert alert-danger" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-error-warning-fill"></i>
-                        </span>
-                        <br>
-                        <p>Booking confirmation cancelled successfully</p>
-                        <hr>
-                        <a href="index.php" class="btn btn-outline-primary">Make a booking</a>
-                        <a href="admin-view-booking.php?booking_id=<?= $book_id ?>" class="btn btn-primary">Done</a>
-                    </div>
-                </div>
-                <?php 
-            }else{
-                ?>
-                <div class="container mt-3">
-                    <div class="error-message text-center text-danger alert alert-danger" role="alert">
-                        <span class="fs-2">
-                            <i class="ri-error-warning-fill"></i>
-                        </span>
-                        <br>
-                        <p>There's something wrong with the booking. Please try again.</p>
-                        <hr>
-                        <a href="admin-view-booking.php?booking_id=<?= $book_id ?>" class="btn btn-primary">Try again</a>
-                    </div>
-                </div>
-                <?php 
-            }
-
-
-    }else{}
-    
+    if ($waitlist_notice): ?>
+        <div class="container mt-3">
+            <div class="alert alert-<?= $waitlist_notice[0] ?>" role="alert"><?= $waitlist_notice[1] ?></div>
+        </div>
+    <?php endif;
     ?>
 
     <?php 
@@ -444,7 +283,15 @@ function get_admin_booking_date_compare($date, $timeslot){
 
     <?php 
     //If mark as paid
-    if( $mark_as_paid == 'true'){
+    if( $mark_as_paid == 'true' && $bookings[0]['booking_note'] == 'waitlist-reserved' ){
+    ?>
+        <div class="container mt-3">
+        <div class="alert alert-warning" role="alert">
+         This is a waitlist reservation. Use <b>Confirm Booking</b> below so the member's credit is deducted, or <b>Decline Offer</b> to release the court.
+        </div>
+        </div>
+    <?php
+    }elseif( $mark_as_paid == 'true'){
         $payment_remark = '';
         $stmt_bk = $pdo->prepare("UPDATE bookings SET payment_remark = ?
          WHERE id = ?");
@@ -581,11 +428,11 @@ function get_admin_booking_date_compare($date, $timeslot){
                         <div class="row justify-content-between">
                             <div class="col-auto">
                                 <h4>This booking is a reservation for a waitlist.</h4>
-                                Member has not confirmed this booking yet.
+                                Member has not confirmed this booking yet. Offer sent <?= htmlspecialchars((string) $waitlist['updated_at']) ?>; it expires 2 hours later.
                             </div>
                             <div class="col-auto">
-                                <a class="btn btn-outline-dark" id="reserveMarkExpiredBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_confirm=false&waitlist_id=<?= $waitlist['wait_list_id'] ?>&free_court=<?= $waitlist['free_court'] ?>&date=<?= $waitlist['date'] ?>&timeslot=<?= $waitlist['timeslot'] ?>&book_id=<?= $waitlist['waitlist_booking_id'] ?>&waitlist_member_id=<?= $waitlist['member_id'] ?>">Cancel Booking Confirmation</a>
-                                <a class="btn btn-primary" id="reserveConfirmBookingBtn"href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_confirm=true&waitlist_id=<?= $waitlist['wait_list_id'] ?>&free_court=<?= $waitlist['free_court'] ?>&date=<?= $waitlist['date'] ?>&timeslot=<?= $waitlist['timeslot'] ?>&book_id=<?= $waitlist['waitlist_booking_id'] ?>&waitlist_member_id=<?= $waitlist['member_id'] ?>">Confirm Booking</a>
+                                <a class="btn btn-outline-dark" id="reserveMarkExpiredBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=decline&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Decline this offer for the member? The court will go to the next member on the waitlist.')">Decline Offer</a>
+                                <a class="btn btn-primary" id="reserveConfirmBookingBtn" href="admin-view-booking.php?booking_id=<?= $booking_id ?>&waitlist_action=confirm&waitlist_id=<?= $waitlist['wait_list_id'] ?>" onclick="return confirm('Confirm this booking and deduct <?= number_format(lsc_waitlist_total_price($waitlist['timeslot'], $waitlist['waitlist_note'])) ?> THB from the member\'s credit?')">Confirm Booking (<?= number_format(lsc_waitlist_total_price($waitlist['timeslot'], $waitlist['waitlist_note'])) ?> THB)</a>
                             </div>
                         </div>
                         

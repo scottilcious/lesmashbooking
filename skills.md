@@ -4,15 +4,26 @@ Task recipes for this codebase. Each entry says where to look and what to keep c
 
 ## Run locally
 
-1. Create a MariaDB/MySQL database and import the latest dump (`scottde_lscbooking_*.sql`).
-2. Edit `config.php` with local credentials and set `DISABLE_NOTIFICATIONS` to `true` so no LINE or SMS is sent.
-3. Serve the folder with PHP's built-in server:
+1. Create two MySQL databases (dev and test) and import the latest dump into the dev one.
+2. Copy `config.example.php` to `config.local.php`; set `DB_*`, `DB_TEST_DATABASE`, and `DISABLE_NOTIFICATIONS` to `true`.
+3. Serve the folder with PHP's built-in server (or use the `php-dev` entry in `.claude/launch.json`):
 
 ```bash
-php -S localhost:8000
+php -S localhost:8010
 ```
 
 4. Log in as any member from the dump. Passwords are plaintext in `members.member_password`.
+
+## Run the tests
+
+```bash
+php tests/run.php
+```
+
+`tests/bootstrap.php` rebuilds `DB_TEST_DATABASE` from `database/schema.sql` and truncates between tests.
+Fixtures: `t_member()`, `t_booking()`, `t_waitlist()`; assertions: `assert_eq`, `assert_same`, `assert_true`, `assert_null`.
+The waitlist tests pin the clock with `lsc_waitlist_now()` and capture SMS with `lsc_waitlist_set_notifier()`.
+Pass a filter to run one file: `php tests/run.php Waitlist`.
 
 ## Change a price
 
@@ -64,10 +75,18 @@ Cancellation and refund rows are separate rows with `transaction_type` in
 
 ## Debug the waitlist
 
-Flow: cancellation -> `getLatestWaitlistEntryWithPhone()` -> placeholder booking with
-`booking_note = 'waitlist-reserved'` and `payment_remark = 'Not paid yet'` -> SMS ->
-member confirms on `waitlist.php` within 2 hours -> credit deducted, `waitlist_status = 'confirmed'`.
-`expireOldPendingWaitlists()` runs lazily on the next cancellation, not on a cron.
+All logic is in `includes/waitlist-service.php`:
+
+- `lsc_waitlist_offer_slot($pdo, $court, $date, $timeslot)` is called by both cancel handlers. It creates a
+  placeholder booking (`booking_note = 'waitlist-reserved'`, `payment_remark = 'Not paid yet'`), two
+  `waitlist offer` transaction rows, sets `waitlist_status = 'pending'` and sends the SMS.
+- `lsc_waitlist_confirm($pdo, $waitlistId, $actor)` charges the waitlisted member (court fee + guests),
+  promotes the ledger rows to `booking (member)`, marks the booking paid. Used by `waitlist.php`
+  (member) and `admin-view-booking.php` (admin, `waitlist_action=confirm`).
+- `lsc_waitlist_decline(...)` and `lsc_waitlist_expire_stale($pdo)` release the court and immediately
+  offer it to the next waiting member. The sweep runs lazily on `waitlist.php` and from `cron/waitlist-expire.php`.
+- Offers expire 2 h after `wait_list.updated_at` or when the slot is within 2 h of starting.
+- Guest (non-member) waitlist entries are never offered; they have no credit balance.
 
 Useful query:
 

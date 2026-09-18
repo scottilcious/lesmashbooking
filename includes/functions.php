@@ -43,7 +43,7 @@ function get_member_info($member_id, $member_type){
         while($row = $results->fetch_assoc()) {
 
             $member_data['message'] = 'Member found';
-            $member_data['id'] = $row['d'];
+            $member_data['id'] = $row['id'];
             $member_data['member_number'] = $row['member_number'];
             $member_data['first_name'] = $row['first_name'];
             $member_data['last_name'] = $row['last_name'];

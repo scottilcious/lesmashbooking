@@ -129,7 +129,7 @@ function get_member_info_with_passed_id($member_id){
         while($row = $results->fetch_assoc()) {
 
             $member_data['message'] = 'Member found';
-            $member_data['id'] = $row['d'];
+            $member_data['id'] = $row['id'];
             $member_data['member_number'] = $row['member_number'];
             $member_data['first_name'] = $row['first_name'];
             $member_data['last_name'] = $row['last_name'];
@@ -169,7 +169,7 @@ function get_booking_detail_from_transaction($transaction_id){
         while($row = $results->fetch_assoc()) {
 
             $booking_data['message'] = 'Booking found';
-            $booking_data['id'] = $row['d'];
+            $booking_data['id'] = $row['id'];
             $booking_data['court'] = $row['court'];
             $booking_data['date'] = $row['date'];
             $booking_data['timeslot'] = $row['timeslot'];

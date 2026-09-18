@@ -97,10 +97,12 @@ Key/value. Only key today: `allow_midnight_booking`.
 - Admin "save booking" with status cancelled and refund flag adds the given credit back.
 
 ### Waitlist
-1. User ticks "Waitlist" on a slot; a `wait_list` row is created with NULL status. Payment option becomes "Pay at confirmation".
-2. On any cancellation of that date/time more than 2 hours before start, the oldest waiting entry is promoted: a placeholder approved booking is created on the freed court (`payment_remark = 'Not paid yet'`, `booking_note = 'waitlist-reserved'`), status becomes `pending`, and an SMS is sent to the member's phone.
-3. The member has 2 hours to confirm on the waitlist page. Confirm deducts credit and sets `confirmed`. Decline or timeout sets `expired` and cancels the placeholder.
-4. Members must confirm a phone number before joining a waitlist; a low-credit warning shows below 260 THB.
+1. User ticks "Waitlist" on a slot; a `wait_list` row is created with NULL status. Payment option becomes "Pay at confirmation". Guest count is stored in `waitlist_note`.
+2. When a booking in that date/time is cancelled (member self-cancel, or admin plain cancel; rain cancellations do not count) and the slot starts more than 2 hours from now, the oldest waiting **member** entry is offered the freed court: a placeholder approved booking is created (`payment_remark = 'Not paid yet'`, `booking_note = 'waitlist-reserved'`), two ledger rows typed `waitlist offer` are written, `waitlist_status` becomes `pending`, `updated_at` records the offer time, and an SMS is sent.
+3. The member has 2 hours from the SMS to confirm on the waitlist page, or an admin can confirm from the booking detail page. Confirmation charges the **waitlisted member** the court fee plus 200 THB per guest, marks the booking paid by credit, promotes the ledger rows to `booking (member)` and sets `confirmed`. Insufficient credit leaves the offer open.
+4. Declining (member or admin), the 2 hour timeout, or the slot coming within 2 hours releases the placeholder (`cancelled`), zeroes the ledger rows, sets `declined`/`expired`, and immediately offers the court to the next waiting member. The sweep runs on every waitlist page view and from `cron/waitlist-expire.php`.
+5. Non-member waitlist entries are recorded but never offered (no credit balance to charge).
+6. Members must confirm a phone number before joining a waitlist; a low-credit warning shows below 260 THB.
 
 ### Membership
 - Expiry date shown in the header; expired members see a notice and cannot book.
@@ -139,4 +141,4 @@ Key/value. Only key today: `allow_midnight_booking`.
 - Free-text enums with inconsistent values in production data.
 - Audit log read fully into memory on every admin view.
 - Several dead files and an unused alternate waitlist design (`waitlist_offers`).
-- No automated tests, staging environment, or deployment pipeline.
+- No staging environment or deployment pipeline. Tests exist only for the waitlist service (`tests/`).

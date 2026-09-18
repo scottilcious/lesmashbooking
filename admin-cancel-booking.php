@@ -9,7 +9,7 @@ if (!isset($_SESSION["user_id"])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    include 'booking_functions/dynamic-waitlist.php';
+    require_once 'includes/waitlist-service.php';
 
     $booking_id = $_POST["booking_id"];
     $credit_refund = $_POST["credit_refund"];
@@ -127,88 +127,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     }
 
-    //Prepare values for waitlist
-    $notify_court    = $booking_court;
-    $notify_date     = $booking_date;
-    $notify_timeslot = $booking_timeslot;
-    $formattedNotifyDate = date('F j, Y', strtotime($notify_date));
-
-    //Check if past grace period 
-    $formatted_time = get_timeslot_for_waitlist($notify_timeslot);
-    $diffSeconds = getTimeDifferenceFromNow($notify_date, $formatted_time);
-
-    //Finding waitlist with member phone number
-    $latest_waitlist = getLatestWaitlistEntryWithPhone($pdo, $notify_date, $notify_timeslot);
-    if ($latest_waitlist && $diffSeconds > 2 * 3600 && $cancellation_note == 'admin-cancelled' ) {
-
-        $queried_waitlist_id = $latest_waitlist['wait_list_id'];
-        $queried_waitlist_type = $latest_waitlist['member_type'];
-        $queried_waitlist_member_id = $latest_waitlist['member_db_id'];
-        $queried_waitlist_member_credit = $latest_waitlist['member_credit'];
-        $queried_waitlist_member_phone = $latest_waitlist['member_phone'];
-
-        //Prep variables for a booking
-        $waitlist_id = $queried_waitlist_id;
-        $passed_date = $notify_date;
-        $passed_timeslot = $notify_timeslot;
-        $free_court = $notify_court;
-
-        //Check if the booking already exists then update waitlist status
-        if( waitlistBookingExists($pdo, $free_court, $passed_date, $passed_timeslot)){
-            $updatedWaitlistStatus = 'expired';
-            $booking_id = NULL;
-            updateWaitlistStatus($pdo, $waitlist_id, $updatedWaitlistStatus, $free_court, $booking_id);
-        }
-
-        //Create transaction
-        $created_transaction_id = create_waitlist_booking_transaction($pdo, $queried_waitlist_member_id, $free_court, $passed_timeslot, $passed_date);
-
-        //Create assoc transaction
-        $created_assoc_transaction_id = create_assoc_transaction($pdo, $created_transaction_id, $queried_waitlist_member_id, $free_court, $passed_timeslot, $passed_date);
-
-        //Create a booking
-        $daily_member_type = waitlist_get_member_type($pdo, $queried_waitlist_member_id);
-        $booking_fee = get_pricing_rule_by_timeslot($passed_timeslot);
-
-        $payment_type = 'cash';
-        $payment_remark = 'Not paid yet';
-
-        $bookingData = [
-            'court'              => $free_court,
-            'date'               => $passed_date,
-            'timeslot'           => $passed_timeslot,
-            'member_id'          => $queried_waitlist_member_id,
-            'non_member_id'      => '90002',
-            'booking_status'     => 'approved',
-            'booking_type'       => 'member booking',
-            'daily_member_type'  => $daily_member_type,
-            'payment'            => $payment_type,
-            'transaction_id'     => $created_assoc_transaction_id,
-            'payment_remark'     => $payment_remark,
-            'slip'               => null,
-            'coach'              => null,                 // 1/0 or coach id depending on schema
-            'coach_extra_player' => null,
-            'coach_name'         => null,
-            'booking_note'       => 'waitlist-reserved',
-            'non_member_info'    => null,              // or JSON/text if walk-in
-        ];
-
-        $bookingId = waitlistCreateBooking($pdo, $bookingData);
-
-        //Update waitlist status after making a booking 
-        if( $bookingId){
-            $waitlist_status = 'pending';
-            updateWaitlistStatus($pdo, $waitlist_id, $waitlist_status, $free_court, $bookingId);
-
-            //Send SMS
-            $sms_msg = "Our court " . $notify_court . " on " . $formattedNotifyDate . " at " . $notify_timeslot . " from your waitlist is available now. Please login to your account to confirm the booking." ;
-
-            //echo $sms_msg;
-
-            send_sms_mkt($queried_waitlist_member_phone, $sms_msg);
-        }
-
-    
+    //Offer the freed court to the first member on the waitlist. Rain/pollution cancellations do not free a playable court.
+    if ($result && $cancellation_note == 'admin-cancelled') {
+        lsc_waitlist_offer_slot($pdo, (int) $booking_court, $booking_date, $booking_timeslot);
     }
 
     //Refund Credit

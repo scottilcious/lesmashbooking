@@ -1,4 +1,7 @@
 <?php
+// All times in this application are club-local time.
+date_default_timezone_set('Asia/Bangkok');
+
 // Secrets and environment settings live in config.local.php (gitignored). See config.example.php.
 $lsc_local_config = __DIR__ . '/config.local.php';
 if (!file_exists($lsc_local_config)) {
