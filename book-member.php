@@ -247,6 +247,16 @@ if( $check_more_than_2hours > $max_hour_compare ){
         
     }
 
+    // ---- All writes below run in ONE transaction under a per-date lock (includes/booking-service.php).
+    require_once 'includes/booking-service.php';
+    require_once 'includes/functions.php';
+    try {
+        lsc_booking_begin($pdo, $date);
+        // Re-check inside the lock: another request may have taken the slot since the pre-check above.
+        lsc_booking_assert_slots_free($pdo, $courts, $times, $date, 'index.php');
+        if ($payment_type === 'credit' && (float) $transaction_amount > 0) {
+            lsc_booking_assert_credit($pdo, $member_id, (float) $transaction_amount, 'add-credit.php');
+        }
     // CREATE TRANSACTION
     if( $transaction_amount > 0 ){
 
@@ -276,7 +286,7 @@ if( $check_more_than_2hours > $max_hour_compare ){
             
 
         }catch (PDOException $e) {
-            echo $e->getMessage();
+            throw $e; // rolls back the whole booking
         }
 
     }
@@ -330,13 +340,25 @@ if( $check_more_than_2hours > $max_hour_compare ){
         $booking_message = "success";
 
     }catch (PDOException $e) {
-        echo $e->getMessage();
-    }
+            throw $e; // rolls back the whole booking
+        }
 
     // REDUCE CREDIT 
     if( $payment_type == 'credit' && (float) $transaction_amount > 0 ){
         $stmt = $pdo->prepare("UPDATE members SET credit = credit - ? WHERE id = ? ");
         $result = $stmt->execute([$transaction_amount, $member_id]);
+    }
+
+        lsc_booking_commit($pdo, $date);
+    } catch (LscBookingConflict $e) {
+        lsc_booking_abort($pdo, $date);
+        lsc_booking_render_conflict($e);
+        exit;
+    } catch (Throwable $e) {
+        lsc_booking_abort($pdo, $date);
+        lsc_log('Booking Failed', basename('book-member.php') . ': ' . get_class($e) . ': ' . $e->getMessage());
+        lsc_booking_render_conflict(new LscBookingConflict("There's something wrong with the booking. Nothing was charged. Please try again.", 'index.php'));
+        exit;
     }
 
     // SHOW MESSAGE

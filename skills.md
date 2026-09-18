@@ -62,6 +62,15 @@ Two hardcoded arrays, `$court_exempt_dates` and `$court_closed_dates`, exist in 
 - Add a case in `get_admin_booking_type()` in `modules/time-table.php` and `check_availability.php`.
 - Add the radio in `modules/admin-booking-menu.php`.
 
+## How a booking is written
+
+Each `book-*.php` handler: pre-checks (window, advance limit, duplicates, per-day limits, credit) ->
+optional slip upload -> `lsc_booking_begin($pdo, $date)` (named lock `lsc_booking_<date>` + transaction) ->
+`lsc_booking_assert_slots_free()` and, for credit payments, `lsc_booking_assert_credit()` (row lock) ->
+parent transaction row, one child row + booking per court-hour, credit deduction -> `lsc_booking_commit()`.
+Any exception rolls everything back and renders `lsc_booking_render_conflict()` with HTTP 409.
+Two requests for the same date are serialised by the lock, so the second one sees the first one's rows.
+
 ## Approve a credit refill (how it works)
 
 `check_member_credit.php` renders the approval panel inside `admin-view-transaction.php`; the admin may edit

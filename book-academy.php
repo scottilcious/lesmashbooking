@@ -31,9 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $coach_name             = '';
     $non_member_info        = '';
 
+    // ---- All writes below run in ONE transaction under a per-date lock (includes/booking-service.php).
+    require_once 'includes/booking-service.php';
+    require_once 'includes/functions.php';
+    try {
+        lsc_booking_begin($pdo, $date);
     /* MAKE BOOKING */
     $courts             = explode(",", $all_selected_courts);
     $times              = explode(",", $all_selected_times);
+        // Re-check inside the lock: an academy block must never overwrite a live booking.
+        lsc_booking_assert_slots_free($pdo, $courts, $times, $date, 'admin-court-booking.php');
 
     try {
         foreach ($courts as $key => $court_value) {
@@ -59,9 +66,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $booking_message = "success";
 
     }catch (PDOException $e) {
-        echo $e->getMessage();
-    }
+            throw $e; // rolls back the whole booking
+        }
 
+
+        lsc_booking_commit($pdo, $date);
+    } catch (LscBookingConflict $e) {
+        lsc_booking_abort($pdo, $date);
+        lsc_booking_render_conflict($e);
+        exit;
+    } catch (Throwable $e) {
+        lsc_booking_abort($pdo, $date);
+        lsc_log('Booking Failed', basename('book-academy.php') . ': ' . get_class($e) . ': ' . $e->getMessage());
+        lsc_booking_render_conflict(new LscBookingConflict("There's something wrong with the booking. Nothing was charged. Please try again.", 'admin-court-booking.php'));
+        exit;
+    }
 
     /* SHOW MESSAGE */
     if( $booking_message == 'success'){

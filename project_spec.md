@@ -129,12 +129,12 @@ Key/value. Only key today: `allow_midnight_booking`.
 2. Date change -> AJAX POST to `check_availability.php` -> returns table rows.
 3. Checkbox changes -> `app.js` validates rules, builds `all_selected_courts` / `all_selected_times` CSVs and computes the fee client-side.
 4. "Make a booking" -> `app.js` picks the handler by role and booking type and POSTs multipart form data.
-5. Handler re-validates window, advance limit, duplicates, per-day limit and credit balance, uploads the slip, writes parent and child transactions, writes bookings, adjusts credit, logs, sends LINE, and returns an HTML success fragment.
+5. Handler re-validates window, advance limit, duplicates, per-day limit and credit balance, uploads the slip, then inside one database transaction under a per-date lock re-checks the slots and credit, writes parent and child transactions, bookings and the credit deduction, commits, logs, sends LINE, and returns an HTML success fragment. Any failure rolls everything back and returns HTTP 409 with a message.
 
 ## 7. Known gaps and risks
 
 - Passwords are reversibly encrypted rather than hashed, so that staff can read them; the key on the server is the single secret protecting them.
-- No database transactions around multi-step writes except waitlist confirm.
+- Cancellation handlers still write ledger rows and refunds without a transaction (booking and waitlist writes are transactional).
 - Business constants duplicated across PHP and JS.
 - Free-text enums with inconsistent values in production data.
 - Audit log read fully into memory on every admin view.

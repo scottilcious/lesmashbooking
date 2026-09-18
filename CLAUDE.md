@@ -28,6 +28,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 | `check_availability.php` | AJAX re-render of the grid for a chosen date, plus the client-side rule JS |
 | `book-member.php`, `book-non-member.php`, `book-admin-member.php`, `book-admin-non-member.php`, `book-academy.php` | Booking submit handlers, chosen by `app.js` |
 | `cancel_booking.php`, `admin-cancel-booking.php` | Cancellation, refunds, waitlist promotion |
+| `includes/booking-service.php` | Per-date lock + transaction for the `book-*.php` handlers: `lsc_booking_begin/commit/abort`, slot and credit re-checks, `LscBookingConflict` |
 | `includes/waitlist-service.php` | **The** waitlist implementation: offer, confirm, decline, expire (see header comment) |
 | `waitlist.php` | Member waitlist page; calls the service |
 | `cron/waitlist-expire.php` | CLI sweep for stale offers; run every 5 min |
@@ -62,7 +63,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
-- When touching booking or cancellation flows, wrap multi-statement writes in a PDO transaction.
+- Booking writes go inside `lsc_booking_begin($pdo, $date)` ... `lsc_booking_commit()` from `includes/booking-service.php`, with `lsc_booking_assert_slots_free()` re-run inside. Throw `LscBookingConflict` to abort with a message; never `echo` an exception and carry on.
 - Preserve the existing HTML fragment response shape for AJAX endpoints unless you also update the caller in `app.js`.
 - Log user-visible state changes through `lsc_log()`.
 
@@ -70,3 +71,4 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
 - Grid rendering and pricing logic are duplicated across three files.
+- The cancellation handlers still write ledger rows and refunds as separate statements (no transaction yet).
