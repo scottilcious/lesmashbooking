@@ -2,12 +2,17 @@
 session_start();
 require 'config.php';
 require_once 'includes/password.php';
-$member_id = $_GET['member_id'];
+// Only the account that just logged in with the default password may be changed here.
+$member_id = (int) ($_SESSION['pw_change_member_id'] ?? 0);
+if ($member_id <= 0) {
+    header('Location: login.php');
+    exit;
+}
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $password = $_POST["password"];
     $confirm_password = $_POST["confirm_password"];
-    $pass_member_id = $_POST["pass_member_id"];
+    $pass_member_id = $member_id;
 
     if (empty($password) || empty($confirm_password)) {
         $error = "Please enter password.";
@@ -26,8 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->execute([$pass_member_id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $_SESSION["user_id"] = $user["id"];
-            $_SESSION["member_number"] = $user["member_number"];
+            unset($_SESSION['pw_change_member_id']);
             header("Location: login.php?change_password=true");
             exit;
 
@@ -93,8 +97,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                             <button type="submit" class="btn btn-primary w-100">Change password</button>
                         </form>
-                        <p class="text-center mt-3">Don't have an account? <a href="register.php">Register here</a></p>
-                        <hr>
                         <p class="text-center mt-3">Have a different account? <a href="login.php">Login</a></p>
                     </div>
                 </div>

@@ -4,17 +4,17 @@ require 'config.php';
 require_once 'includes/functions.php';
 require_once 'includes/password.php';
 
-$member_type = $_GET["member_type"];
+$member_type = $_GET["member_type"] ?? '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $member_number = trim($_POST["member_number"]);
-    $password = $_POST["password"];
+    $member_number = trim((string) ($_POST["member_number"] ?? ''));
+    $password = (string) ($_POST["password"] ?? '');
 
-    $guest_fullname = $_POST["guest_fullname"];
-    $guest_email = $_POST["guest_email"];
-    $guest_phone_number = $_POST["guest_phone_number"];
+    $guest_fullname = trim((string) ($_POST["guest_fullname"] ?? ''));
+    $guest_email = trim((string) ($_POST["guest_email"] ?? ''));
+    $guest_phone_number = trim((string) ($_POST["guest_phone_number"] ?? ''));
 
-    $login_type = $_POST["login_type"];
+    $login_type = $_POST["login_type"] ?? 'member';
 
     //MEMBER LOGIN
     if( $login_type == 'member'){
@@ -33,7 +33,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if ($user && $password == 'lesmashclubmember'){
 
-                header("Location: change-password.php?member_id=".$user["id"]);
+                $_SESSION['pw_change_member_id'] = (int) $user['id'];
+                header("Location: change-password.php");
                 exit;
             
             }elseif( $user && $password != 'lesmashclubmember' ){

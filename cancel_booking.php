@@ -1,28 +1,37 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_login();
 require 'config.php';
 require_once 'includes/functions.php';
 require_once 'includes/member-functions.php';
 require_once 'includes/booking-functions.php';
 
-if (!isset($_SESSION["user_id"])) {
-    die("Unauthorized access.");
-}
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
 
     require_once 'includes/waitlist-service.php';
 
-    $booking_id = $_POST["booking_id"];
-    $bookingType = $_POST["bookingType"];
-    $user_id = $_POST["userId"];
-
-    $isNonMember = ($bookingType === 'non-member' || $bookingType === 'non_member');
+    $booking_id = (int) $_POST["booking_id"];
+    $user_id = $lsc_me['id'];            // identity comes from the session, never from the form
+    $isNonMember = $lsc_me['is_guest'];
 
     //Get this booking info 
     $bk_stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
     $bk_stmt->execute([$booking_id]);
     $booking = $bk_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $owner_ok = !empty($booking) && $booking[0]['booking_status'] !== 'cancelled'
+        && ($isNonMember ? (int) $booking[0]['non_member_id'] === $user_id : (int) $booking[0]['member_id'] === $user_id);
+    if (!$owner_ok) {
+        http_response_code(403);
+        ?>
+        <div class="error-message text-center text-danger">
+            <span class="fs-2"><i class="ri-error-warning-fill"></i></span><br>
+            <p>This booking cannot be cancelled from your account.</p>
+            <button type="button" class="btn btn-primary" onclick="location.reload()">Back</button>
+        </div>
+        <?php
+        exit;
+    }
     $this_booking_transaction_id = $booking[0]['transaction_id'];
     $this_booking_id = $booking[0]['id'];
     $this_booking_date = $booking[0]['date'];

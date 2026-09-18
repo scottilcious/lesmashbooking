@@ -31,7 +31,7 @@ Court fee (160 / 280) and guest fee (200) are hardcoded in:
 
 - `check_availability.php` (`calc_court_booking_fee`, `get_price_from_timeslot`)
 - `book-member.php`, `book-non-member.php`, `book-admin-member.php`, `book-admin-non-member.php`
-- `booking_functions/dynamic-waitlist.php` (`getTransactionPrice`)
+- `includes/waitlist-service.php` (`LSC_COURT_FEE_*`, `LSC_GUEST_FEE`, `LSC_COACH_FEE`, `LSC_DAILY_FEES`)
 - `booking_functions/bookings.js` (low-credit threshold)
 - `modules/time-table.php` (display text)
 - `modules/select-coach-option.php` (guest fee label)
@@ -96,6 +96,29 @@ Useful query:
 SELECT * FROM wait_list WHERE date = ? AND timeslot = ? ORDER BY created_at;
 ```
 
+## Add a page or AJAX handler
+
+Start the file with the right guard from `includes/auth.php`:
+
+```php
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_admin();            // AJAX: 401/403 text
+$lsc_me = lsc_require_admin('redirect');  // page: send to login.php
+$lsc_me = lsc_require_member();           // member or admin
+$lsc_me = lsc_require_guest();            // non-member
+$lsc_me = lsc_require_login();            // anyone logged in
+```
+
+Use `$lsc_me['id']`, `['type']`, `['is_admin']`, `['is_guest']`. Never read `member_id` / `user_id` from the request
+for the acting user. Admin screens may still take a *target* member id from the request.
+
+## HTTP tests
+
+`tests/http.php` starts `php -S 127.0.0.1:8099` with `LSC_DB_DATABASE=lsc_test` (honoured by `config.php`) and
+gives `t_http_login($number, $password)`, `t_http_login_guest(...)`, `t_http_get()`, `t_http_post()`.
+Errors from that server go to `/tmp/lsc-test-server.log`. See `tests/AuthHttpTest.php` for the pattern:
+build fixtures with `t_member()` / `t_booking()`, call the real page, assert on the database.
+
 ## Passwords
 
 Stored encrypted in `members.member_password` as `enc1:<base64>` (AES-256-GCM, key in `config.local.php`).
@@ -116,7 +139,7 @@ when it grows past a few tens of MB.
 ## Send notifications
 
 - LINE broadcast: `lsc_send_line_broadcast($message, LINE_BROADCAST_TOKEN)`. Inside the waitlist service use `lsc_waitlist_notify('line', '', $msg)` so tests can capture it.
-- SMS: `send_sms_mkt($phone, $message)` in `booking_functions/dynamic-waitlist.php`.
+- SMS: `lsc_send_sms_notification($phone, $message, SMSMKT_API_KEY, SMSMKT_SECRET_KEY, SMSMKT_SENDER)`; inside the waitlist service use `lsc_waitlist_notify('sms', $phone, $msg)`.
 - Both are suppressed and logged when `DISABLE_NOTIFICATIONS` is true.
 
 ## Inspect the database offline

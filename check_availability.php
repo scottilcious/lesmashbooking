@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_login();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     include_once 'includes/member-functions.php';
@@ -7,10 +9,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     //Passed params
     //$court = $_POST['court'];
     $passed_date = $_POST['date'];
-    $memberType = $_POST['member_type'];
-    $admin_view = $_POST['admin_view'];
-    $selected_member_id = $_POST['member_id'] ?? null;
-    $limit_member_type = $_POST['limit_member_type'] ?? $memberType;
+    // Identity and role come from the session; the form values are only trusted for admins choosing a member.
+    $memberType = $lsc_me['type'];
+    $admin_view = $lsc_me['is_admin'] ? 'true' : 'false';
+    if ($lsc_me['is_admin']) {
+        $selected_member_id = $_POST['member_id'] ?? null;
+        $limit_member_type = $_POST['limit_member_type'] ?? $memberType;
+    } else {
+        $selected_member_id = $lsc_me['id'];
+        $limit_member_type = $memberType;
+    }
 
     if (!lsc_is_booking_window_open_for_member($memberType)) {
         ?>

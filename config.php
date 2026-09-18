@@ -16,13 +16,15 @@ if (!defined('DISABLE_NOTIFICATIONS')) {
 if (!defined('DB_PORT')) {
     define('DB_PORT', 3306);
 }
+// Tests run the real pages against a separate database by setting this environment variable.
+define('LSC_ACTIVE_DATABASE', getenv('LSC_DB_DATABASE') ?: DB_DATABASE);
 if (!defined('PASSWORD_ENCRYPTION_KEY') || strlen((string) PASSWORD_ENCRYPTION_KEY) !== 64) {
     die("PASSWORD_ENCRYPTION_KEY is missing or not 64 hex characters in config.local.php. See config.example.php.");
 }
 
 // Legacy variables still referenced by some files
 $host = DB_HOSTNAME;
-$dbname = DB_DATABASE;
+$dbname = LSC_ACTIVE_DATABASE;
 $user = DB_USERNAME;
 $pass = DB_PASSWORD;
 
@@ -37,7 +39,7 @@ if (!function_exists('lsc_create_pdo')) {
 }
 
 try {
-    $pdo = lsc_create_pdo(DB_DATABASE);
+    $pdo = lsc_create_pdo(LSC_ACTIVE_DATABASE);
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }

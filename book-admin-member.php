@@ -1,7 +1,6 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_admin();
 
 function lsc_admin_member_booking_rules($member_type)
 {

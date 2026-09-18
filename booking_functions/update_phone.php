@@ -2,10 +2,12 @@
 // update_phone.php
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/../config.php'; // define $pdo (PDO connection) or inline it below
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/auth.php';
+$lsc_me = lsc_require_member();
 
 // Basic validation
-$userId = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
+$userId = $lsc_me['id']; // only your own phone
 $memberPhone = isset($_POST['member_phone']) ? trim($_POST['member_phone']) : '';
 
 if ($userId <= 0 || $memberPhone === '') {

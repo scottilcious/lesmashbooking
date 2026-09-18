@@ -111,7 +111,7 @@ function check_member_expired($expired_date){
 
 function get_member_info_with_passed_id($member_id){
     // Create connection
-    $conn = new mysqli(DB_HOSTNAME, DB_USERNAME, DB_PASSWORD, DB_DATABASE, DB_PORT);
+    $conn = new mysqli(DB_HOSTNAME, DB_USERNAME, DB_PASSWORD, LSC_ACTIVE_DATABASE, DB_PORT);
 
     if( $member_type  == 'non-member'){
         $query = "SELECT * FROM non_members WHERE id = '$member_id'";

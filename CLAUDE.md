@@ -17,6 +17,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
+| `includes/auth.php` | `lsc_require_login/member/guest/admin()`: identity from the session; every handler and admin page calls one |
 | `includes/password.php` | Encrypted password storage: `lsc_password_verify/encrypt/decrypt/for_storage` |
 | `database/migrate-encrypt-passwords.php` | One-off CLI migration of plaintext passwords (idempotent) |
 | `includes/booking-functions.php` | Booking window, advance limit, per-type rules, refund eligibility, system settings |
@@ -36,10 +37,8 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 | `logs/app.log` | JSON-lines audit log written by `lsc_log()` (not committed) |
 | `uploads/` | Payment slip images (not committed) |
 
-Dead or superseded files: `booking_functions/dynamic-waitlist.php` (only `get_timeslot_for_waitlist`-style helpers remain in use by legacy pages; do not add to it), `book.php`, `booking-process.php`, `register.php`,
-`booking_functions/process_waitlist.php`, `booking_functions/confirm-waitlist.php`,
-`booking_functions/testsms.php`, `line-push.php`, `line-api.php`, `extend-membership.php`.
-Do not build on them.
+Superseded but still present: `extend-membership.php` (unlinked). The old `book.php`, `register.php`,
+`line-*.php` and `booking_functions/*` scripts were removed; do not resurrect them.
 
 ## Conventions that are easy to get wrong
 
@@ -50,7 +49,7 @@ Do not build on them.
 - **Member credit** is a running balance in `members.credit`, updated alongside a transaction row. Keep both in step.
 - **Cancelled bookings** stay in the table with `booking_status = 'cancelled'`; every availability query must exclude them.
 - **Free-text enums.** `member_type`, `daily_member_type`, `booking_status`, `booking_type` are varchar with inconsistent casing in real data. Compare with `strtolower(trim(...))`.
-- **Session.** `$_SESSION['user_id']`, `member_type`, `member_number`, `member_fullname`. `member_type === 'admin'` is the only admin check. `menu.php` must be included before using `$userId` / `$memberType`.
+- **Session.** `$_SESSION['user_id']`, `member_type`, `member_number`, `member_fullname`. Use `includes/auth.php` (`$lsc_me = lsc_require_admin()` etc.) at the top of every handler and admin page; `menu.php` still defines `$userId` / `$memberType` for templates.
 - **AJAX handlers return HTML fragments**, not JSON, and the caller injects them into a loader overlay.
 
 ## Rules for changes
@@ -58,6 +57,7 @@ Do not build on them.
 - Run `php tests/run.php` before committing. Add a test for every behaviour change in `includes/`.
 - Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script. Guest offers are admin-confirmed only.
 - Include shared library files with `require_once`/`include_once` (pages mix orders; a plain `include` redeclares functions).
+- **Never take the caller's identity from a form or query string.** Handlers use `$lsc_me['id']` from `includes/auth.php`. Admin-only endpoints call `lsc_require_admin()` (AJAX: `die` mode; pages: `'redirect'`).
 - Passwords: never compare `member_password` in SQL. Look the member up, then `lsc_password_verify()`. Write with `lsc_password_for_storage()`; display to admins with `lsc_password_decrypt()`. The key is `PASSWORD_ENCRYPTION_KEY` in `config.local.php` and must be backed up.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
@@ -69,5 +69,4 @@ Do not build on them.
 ## Known problems (do not "fix" silently; raise them)
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
-- Most AJAX handlers only check that a session exists, not ownership or admin role.
 - Grid rendering and pricing logic are duplicated across three files.

@@ -1,9 +1,7 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_admin();
 
-if (!isset($_SESSION["user_id"])) {
-    die("Unauthorized access.");
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';

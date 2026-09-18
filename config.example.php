@@ -15,9 +15,7 @@ define('DB_TEST_DATABASE', 'your_database_test'); // only needed to run tests/
 
 // LINE Messaging API (https://developers.line.biz/)
 define('LINE_BROADCAST_TOKEN', '');   // channel access token used for broadcast messages
-define('LINE_PUSH_TOKEN', '');        // channel access token used for push messages (legacy book.php)
 define('LINE_ADMIN_USER_ID', '');     // LINE user ID that receives push messages
-define('LINE_TEST_USER_ID', '');      // LINE user ID used by line-api.php for testing
 
 // SMSMKT (https://portal-otp.smsmkt.com/)
 define('SMSMKT_API_KEY', '');

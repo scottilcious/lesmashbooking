@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_member();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
@@ -17,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $booking_type           = $_POST['booking_type'];
     $date                   = $_POST['date'];
 
-    $member_id              = $_POST['member_id'];
+    $member_id              = $lsc_me['id'];
     $daily_member_type      = $_POST['daily_member_type'];
     $daily_member_type_lwr  = strtolower($daily_member_type);
     $coach_option           = $_POST['coach_option'] ?? '';

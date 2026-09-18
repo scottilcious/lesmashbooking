@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/includes/auth.php';
+$lsc_me = lsc_require_admin('redirect');
 ob_start(); // allows redirects after the header has been rendered
 // Database connection
 require 'config.php';
@@ -30,7 +32,6 @@ $delete_booking_action = $_GET['delete_action'];
 </head>
 <body>
     <?php include "menu.php"; 
-    // legacy booking_functions/dynamic-waitlist.php no longer needed here; waitlist logic lives in includes/waitlist-service.php
 
 function getWaitlistByBookingId(PDO $pdo, int $waitlist_booking_id)
 {
