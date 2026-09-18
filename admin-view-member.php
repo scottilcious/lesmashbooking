@@ -1,6 +1,7 @@
 <?php
 // Database connection
 require 'config.php';
+require_once 'includes/password.php';
 $member_id = isset($_GET['member_id']) ? (int) $_GET['member_id'] : 0;
 $transaction_filter = $_GET['transaction_filter'] ?? 'all';
 $allowed_transaction_filters = ['all', 'bookings', 'credit', 'cancellation'];
@@ -234,7 +235,7 @@ function lsc_credit_transaction_where(): string
 
                         <div class="mt-3">
                             <label for="member_password">Password</label>
-                            <input class="form-control form-control-lg" type="text" name="member_password" id="member_password" value="<?php echo $members[0]['member_password'];?>" />
+                            <input class="form-control form-control-lg" type="text" name="member_password" id="member_password" value="<?php echo htmlspecialchars((string) lsc_password_decrypt($members[0]['member_password'])); ?>" />
                         </div>
 
                         <div class="mt-3">

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'config.php';
+require_once 'includes/password.php';
 
 if (!isset($_SESSION["user_id"])) {
     die("Unauthorized access.");
@@ -39,7 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $discount = $_POST["discount"]; */
         $credit = $_POST["credit"];
         $member_note = $_POST["member_note"];
-        $member_password = $_POST["member_password"];
+        $existing = $pdo->prepare("SELECT member_password FROM members WHERE id = ?");
+        $existing->execute([$member_id]);
+        $member_password = lsc_password_for_storage((string) $_POST["member_password"], $existing->fetchColumn() ?: null);
 
 
          // Ensure the booking belongs to the logged-in user

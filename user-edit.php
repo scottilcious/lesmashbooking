@@ -2,6 +2,7 @@
 session_start();
 // Database connection
 require 'config.php';
+require_once 'includes/password.php';
 //$member_id = $_GET['member_id'];
 
 if (!isset($_SESSION["user_id"])) {
@@ -46,7 +47,9 @@ if (!isset($_SESSION["user_id"])) {
             $last_name = $_POST["last_name"];
             $member_phone = $_POST["member_phone"];
             $member_email = $_POST["member_email"];
-            $member_password = $_POST["member_password"];
+            $existing = $pdo->prepare("SELECT member_password FROM members WHERE id = ?");
+            $existing->execute([$userId]);
+            $member_password = lsc_password_for_storage((string) $_POST["member_password"], $existing->fetchColumn() ?: null);
 
             $stmt = $pdo->prepare("UPDATE members SET 
          first_name= ?, last_name = ?, member_phone = ?, member_email = ?, member_password =?
@@ -111,7 +114,7 @@ if (!isset($_SESSION["user_id"])) {
 
                         <div class="mt-3">
                             <label for="member_password">Password</label>
-                            <input class="form-control form-control-lg" type="text" name="member_password" id="member_password" value="<?php echo $members[0]['member_password'];?>" />
+                            <input class="form-control form-control-lg" type="text" name="member_password" id="member_password" value="<?php echo htmlspecialchars((string) lsc_password_decrypt($members[0]['member_password']));?>" />
                         </div>
 
                         <div class="cta-wrapper border-top mt-5 pt-3 mb-5">

@@ -156,7 +156,7 @@ $member_id = $_GET['member_id'];
 
                         <div class="mt-3">
                             <label for="member_password">Password</label>
-                            <input class="form-control form-control-lg" type="number" name="member_password" id="member_password" value="" />
+                            <input class="form-control form-control-lg" type="text" name="member_password" id="member_password" value="" autocomplete="off" />
                         </div>
 
                         <div class="mt-3">

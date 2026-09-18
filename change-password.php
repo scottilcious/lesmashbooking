@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'config.php';
+require_once 'includes/password.php';
 $member_id = $_GET['member_id'];
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -16,13 +17,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }else{
 
         $chng_pwd_stmt = $pdo->prepare("UPDATE members SET member_password = ? WHERE id = ?");
-        $chng_pwd_user = $chng_pwd_stmt->execute([$password, $pass_member_id]);
+        $chng_pwd_user = $chng_pwd_stmt->execute([lsc_password_encrypt($password), $pass_member_id]);
 
 
         if( $chng_pwd_user ){
 
-            $stmt = $pdo->prepare("SELECT id, member_number, member_password FROM members WHERE member_number = ? AND member_password = ?");
-            $stmt->execute([$pass_member_id, $password]);
+            $stmt = $pdo->prepare("SELECT id, member_number FROM members WHERE id = ?");
+            $stmt->execute([$pass_member_id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             $_SESSION["user_id"] = $user["id"];

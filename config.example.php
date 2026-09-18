@@ -23,3 +23,7 @@ define('LINE_TEST_USER_ID', '');      // LINE user ID used by line-api.php for t
 define('SMSMKT_API_KEY', '');
 define('SMSMKT_SECRET_KEY', '');
 define('SMSMKT_SENDER', 'Lesmashclub');
+
+// Password encryption key: 64 hex chars (32 bytes). Generate: php -r "echo bin2hex(random_bytes(32));"
+// BACK THIS UP. Without it, encrypted member passwords cannot be read and must be reset by an admin.
+define('PASSWORD_ENCRYPTION_KEY', '');

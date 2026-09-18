@@ -17,6 +17,8 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
+| `includes/password.php` | Encrypted password storage: `lsc_password_verify/encrypt/decrypt/for_storage` |
+| `database/migrate-encrypt-passwords.php` | One-off CLI migration of plaintext passwords (idempotent) |
 | `includes/booking-functions.php` | Booking window, advance limit, per-type rules, refund eligibility, system settings |
 | `includes/member-functions.php` | Timeslot to time conversion, date helpers, expiry check |
 | `menu.php` | Header include; also the session guard and defines `$userId`, `$memberType`, `$memberData` |
@@ -55,6 +57,7 @@ Do not build on them.
 
 - Run `php tests/run.php` before committing. Add a test for every behaviour change in `includes/`.
 - Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script.
+- Passwords: never compare `member_password` in SQL. Look the member up, then `lsc_password_verify()`. Write with `lsc_password_for_storage()`; display to admins with `lsc_password_decrypt()`. The key is `PASSWORD_ENCRYPTION_KEY` in `config.local.php` and must be backed up.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
@@ -64,7 +67,6 @@ Do not build on them.
 
 ## Known problems (do not "fix" silently; raise them)
 
-- Passwords stored in plaintext and compared in SQL.
-- LINE tokens, SMSMKT keys and the DB password are hardcoded in source.
+- Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
 - Most AJAX handlers only check that a session exists, not ownership or admin role.
 - Grid rendering and pricing logic are duplicated across three files.

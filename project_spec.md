@@ -21,7 +21,7 @@ hosting (cPanel-style paths). Timezone Asia/Bangkok.
 
 ### members
 Club members and admins. Notable columns: `member_number` (login), `member_password`
-(plaintext), `member_type` (individual, couple, family, junior, 1 adult 1 child, corporate, admin;
+(encrypted `enc1:` blob, readable by admins via the server key), `member_type` (individual, couple, family, junior, 1 adult 1 child, corporate, admin;
 free text with casing variants), `member_status` (active, expired), `member_since`,
 `member_length` (1 year, 6 months, 1 month), `member_expiration`, `credit` decimal running balance.
 
@@ -134,7 +134,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 
 ## 7. Known gaps and risks
 
-- Plaintext passwords; credentials and API tokens in source.
+- Passwords are reversibly encrypted rather than hashed, so that staff can read them; the key on the server is the single secret protecting them.
 - Weak authorization on AJAX endpoints; member IDs taken from form fields.
 - No database transactions around multi-step writes except waitlist confirm.
 - Business constants duplicated across PHP and JS.

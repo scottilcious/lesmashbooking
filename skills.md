@@ -94,6 +94,17 @@ Useful query:
 SELECT * FROM wait_list WHERE date = ? AND timeslot = ? ORDER BY created_at;
 ```
 
+## Passwords
+
+Stored encrypted in `members.member_password` as `enc1:<base64>` (AES-256-GCM, key in `config.local.php`).
+
+- Verify at login: `lsc_password_verify($input, $row['member_password'])`.
+- Save from a form: `lsc_password_for_storage($input, $existingStored)` (blank input keeps the old value).
+- Show to an admin or the member: `lsc_password_decrypt($stored)`.
+- First deploy: copy the key into the server's `config.local.php`, deploy the code, then run
+  `php database/migrate-encrypt-passwords.php --apply` once. Legacy plaintext rows keep working until then.
+- Lost key = every member needs a password reset by an admin. Back the key up somewhere other than the server.
+
 ## Add or read audit log entries
 
 Call `lsc_log($action, $description)` from `includes/functions.php`. Entries are JSON lines in
@@ -116,5 +127,7 @@ Useful distribution checks: `booking_status`, `booking_type`, `daily_member_type
 ## Before deploying
 
 - Diff against the live server; there is no CI and no staging.
-- Confirm `DISABLE_NOTIFICATIONS` is `false` in the deployed `config.php`.
+- Confirm `DISABLE_NOTIFICATIONS` is `false` and `PASSWORD_ENCRYPTION_KEY` is set in the server's `config.local.php`.
+- After the first deploy of password encryption, run `php database/migrate-encrypt-passwords.php --apply` on the server.
+- Add a cron entry for `cron/waitlist-expire.php` every 5 minutes.
 - Never upload `logs/`, `uploads/`, or a `.git` directory to the web root.

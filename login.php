@@ -2,6 +2,7 @@
 session_start();
 require 'config.php';
 require_once 'includes/functions.php';
+require_once 'includes/password.php';
 
 $member_type = $_GET["member_type"];
 
@@ -20,9 +21,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         if( ($member_number && $password )){
 
-            $stmt = $pdo->prepare("SELECT id, member_number, member_password, member_type, first_name, last_name FROM members WHERE member_number = ? AND member_password = ?");
-            $stmt->execute([$member_number, $password]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = $pdo->prepare("SELECT id, member_number, member_password, member_type, first_name, last_name FROM members WHERE member_number = ?");
+            $stmt->execute([$member_number]);
+            $user = false;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
+                if (lsc_password_verify($password, $candidate['member_password'])) {
+                    $user = $candidate;
+                    break;
+                }
+            }
 
             if ($user && $password == 'lesmashclubmember'){
 
