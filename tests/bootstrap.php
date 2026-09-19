@@ -70,7 +70,13 @@ function t_member(array $o = []): int
     $cols = implode(',', array_keys($d));
     $ph = implode(',', array_fill(0, count($d), '?'));
     t_pdo()->prepare("INSERT INTO members ($cols) VALUES ($ph)")->execute(array_values($d));
-    return (int) t_pdo()->lastInsertId();
+    $id = (int) t_pdo()->lastInsertId();
+    if ((float) $d['credit'] != 0.0) {
+        t_pdo()->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, transaction_amount, transaction_type, payment_type, actor_type, actor_name, credit_delta)
+                          VALUES ('Opening balance', ?, 90002, ?, 'Opening balance', 'credit', 'system', 'System', ?)")
+            ->execute([$id, abs((int) $d['credit']), (int) $d['credit']]);
+    }
+    return $id;
 }
 
 function t_guest(array $o = []): int

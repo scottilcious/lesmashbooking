@@ -17,6 +17,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
+| `includes/credit.php` | **The only place a balance changes.** `lsc_credit_move()`, `lsc_credit_adjust()`, `lsc_actor()` |
 | `includes/logging.php` | Audit log: monthly rotation, web-access guard, `lsc_log_write()` and `lsc_log_query()` |
 | `includes/pricing.php` | **All prices.** Constants + `lsc_price_court/guests/daily_fee/coach()`; `menu.php` publishes them to JS as `window.LSC_PRICING` |
 | `includes/auth.php` | `lsc_require_login/member/guest/admin()`: identity from the session; every handler and admin page calls one |
@@ -49,7 +50,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - **Timeslots are strings** exactly as in the `$times` array: `6-7am`, `11am-12pm`, `12-1pm`, `9-10pm`. Convert with `get_time_from_timeslot()`.
 - **Prices live only in `includes/pricing.php`.** PHP calls `lsc_price_court($timeslot)` etc.; JavaScript reads `window.LSC_PRICING` (published by `menu.php`) through `lsc_court_price()` in `app.js`. Never write a price literal anywhere else.
 - **Two transaction rows per booking.** A parent row titled `Booking_<member_id>` holds the total; one child row per court-hour references it via `assoc_transaction_id`. `bookings.transaction_id` points at the child row.
-- **Member credit** is a running balance in `members.credit`, updated alongside a transaction row. Keep both in step.
+- **Member credit** changes only through `lsc_credit_move()` / `lsc_credit_adjust()` in `includes/credit.php`. Never write `UPDATE members SET credit` anywhere else. Each movement stamps `credit_delta` and the actor on its transaction row, so `SUM(credit_delta) = members.credit` for every member.
 - **Cancelled bookings** stay in the table with `booking_status = 'cancelled'`; every availability query must exclude them.
 - **Free-text enums.** `member_type`, `daily_member_type`, `booking_status`, `booking_type` are varchar with inconsistent casing in real data. Compare with `strtolower(trim(...))`.
 - **Session.** `$_SESSION['user_id']`, `member_type`, `member_number`, `member_fullname`. Use `includes/auth.php` (`$lsc_me = lsc_require_admin()` etc.) at the top of every handler and admin page; `menu.php` still defines `$userId` / `$memberType` for templates.
@@ -61,6 +62,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Waitlist behaviour goes through `includes/waitlist-service.php` only. Never deduct credit in a page script. Guest offers are admin-confirmed only.
 - Include shared library files with `require_once`/`include_once` (pages mix orders; a plain `include` redeclares functions).
 - **Never take the caller's identity from a form or query string.** Handlers use `$lsc_me['id']` from `includes/auth.php`. Admin-only endpoints call `lsc_require_admin()` (AJAX: `die` mode; pages: `'redirect'`).
+- **`credit_delta` is the signed balance effect, not the amount.** Informational rows keep 0: the per-court child rows of a booking, and the `Guest transaction` row whose amount is already inside its parent. Counting `transaction_amount` instead double-counts.
 - Passwords: never compare `member_password` in SQL. Look the member up, then `lsc_password_verify()`. Write with `lsc_password_for_storage()`; display to admins with `lsc_password_decrypt()`. The key is `PASSWORD_ENCRYPTION_KEY` in `config.local.php` and must be backed up.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
@@ -75,4 +77,3 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Grid rendering is still duplicated between `modules/time-table.php`, `check_availability.php` and `app.js` (pricing is not).
 - The cancellation handlers still write ledger rows and refunds as separate statements (no transaction yet).
 - `uploads/` (payment slips) is served without authentication; anyone with a URL can read a slip.
-- `admin-save-member.php` writes `members.credit` directly with no ledger row, which makes balances impossible to reconcile.

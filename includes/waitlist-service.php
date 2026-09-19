@@ -29,7 +29,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/functions.php';
-require_once __DIR__ . '/pricing.php';   // LSC_COURT_FEE_*, LSC_GUEST_FEE, LSC_COACH_FEE, LSC_DAILY_FEES
+require_once __DIR__ . '/pricing.php';
+require_once __DIR__ . '/credit.php';   // LSC_COURT_FEE_*, LSC_GUEST_FEE, LSC_COACH_FEE, LSC_DAILY_FEES
 
 const LSC_WAITLIST_OFFER_TTL      = 2 * 3600; // seconds to confirm an offer
 const LSC_WAITLIST_OFFER_MIN_LEAD = 2 * 3600; // slot must start at least this far in the future
@@ -398,8 +399,9 @@ function lsc_waitlist_confirm(PDO $pdo, int $waitlistId, array $actor): array
         }
 
         if (!$isGuest) {
-            $st = $pdo->prepare('UPDATE members SET credit = credit - ? WHERE id = ?');
-            $st->execute([$price, $memberId]);
+            // Deduct from the waitlisted member and record it on the parent ledger row.
+            $parentId = isset($tx['assoc_transaction_id']) ? (int) $tx['assoc_transaction_id'] : 0;
+            lsc_credit_move($pdo, $memberId, -$price, $parentId);
         }
 
         $st = $pdo->prepare("UPDATE wait_list SET waitlist_status = 'confirmed' WHERE wait_list_id = ?");
@@ -482,6 +484,18 @@ function lsc_waitlist_decline(PDO $pdo, int $waitlistId, array $actor, string $r
  * Each expiry offers the court to the next waiting entry. Returns the number expired.
  */
 function lsc_waitlist_expire_stale(PDO $pdo): int
+{
+    // The sweep also runs while a member is browsing; the expiry is the
+    // automation's doing, not theirs, so record it as System.
+    lsc_actor_force_system(true);
+    try {
+        return lsc_waitlist_expire_stale_inner($pdo);
+    } finally {
+        lsc_actor_force_system(false);
+    }
+}
+
+function lsc_waitlist_expire_stale_inner(PDO $pdo): int
 {
     $now = lsc_waitlist_now();
     $st = $pdo->prepare("SELECT wait_list_id, date, timeslot, updated_at FROM wait_list WHERE waitlist_status = 'pending'");

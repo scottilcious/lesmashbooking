@@ -36,7 +36,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $last_renewed = $_POST["last_renewed"];
         /*$new_price = $_POST["new_price"];
         $discount = $_POST["discount"]; */
-        $credit = $_POST["credit"];
         $member_note = $_POST["member_note"];
         $existing = $pdo->prepare("SELECT member_password FROM members WHERE id = ?");
         $existing->execute([$member_id]);
@@ -44,10 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
          // Ensure the booking belongs to the logged-in user
+         // credit is deliberately NOT updated here: it changes only through
+         // admin-adjust-credit.php, so every movement has a reason and a ledger row.
          $stmt = $pdo->prepare("UPDATE members SET member_number = ?,
-         first_name= ?, last_name = ?, member_type = ?, member_status = ?, member_phone = ?, member_email = ?, member_since = ?, member_length = ?, member_expiration = ?, last_renewed = ?, credit = ?, member_password =?, member_note =?
+         first_name= ?, last_name = ?, member_type = ?, member_status = ?, member_phone = ?, member_email = ?, member_since = ?, member_length = ?, member_expiration = ?, last_renewed = ?, member_password =?, member_note =?
          WHERE id = ?");
-         $result = $stmt->execute([$member_number, $first_name, $last_name, $member_type, $member_status, $member_phone, $member_email, $member_since, $member_length, $member_expiration, $last_renewed, $credit, $member_password,  $member_note, $member_id]);
+         $result = $stmt->execute([$member_number, $first_name, $last_name, $member_type, $member_status, $member_phone, $member_email, $member_since, $member_length, $member_expiration, $last_renewed, $member_password,  $member_note, $member_id]);
 
      }
  

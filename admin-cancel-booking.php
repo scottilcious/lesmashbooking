@@ -4,6 +4,7 @@ $lsc_me = lsc_require_admin();
 require 'config.php';
 require_once 'includes/functions.php';
 require_once 'includes/pricing.php';
+require_once 'includes/credit.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -71,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+        $cancellation_transaction_id = (int) $pdo->lastInsertId();
 
         //Guest extra player
         if($booking_extra_player >= 1){
@@ -81,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+            $guest_transaction_id = (int) $pdo->lastInsertId();
 
         }
 
@@ -97,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+        $cancellation_transaction_id = (int) $pdo->lastInsertId();
 
 
         //Guest extra player
@@ -108,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+            $guest_transaction_id = (int) $pdo->lastInsertId();
 
         }
 
@@ -123,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+        $cancellation_transaction_id = (int) $pdo->lastInsertId();
     
     }
 
@@ -144,8 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $stmt_mb = $pdo->prepare("UPDATE members SET credit= credit+? WHERE id = ?");
-            $result_mb = $stmt_mb->execute([$total_refund_amount, $member_id]);
+            // Court refund on the cancellation row, guest refund on its own row, so the two add up.
+            lsc_credit_move($pdo, (int) $member_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
+            if ($guest_refund_amount > 0) {
+                lsc_credit_move($pdo, (int) $member_id, (int) $guest_refund_amount, (int) ($guest_transaction_id ?? 0));
+            }
 
         }catch (PDOException $e) {
             echo $e->getMessage();

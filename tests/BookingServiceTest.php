@@ -27,7 +27,7 @@ test('booking transaction rolls back everything when the callback throws', funct
     } catch (LscBookingConflict $e) {
         assert_same('slot gone', $e->getMessage());
     }
-    assert_eq(0, count(t_rows('transactions')), 'ledger row rolled back');
+    assert_eq(0, count(t_rows('transactions', "transaction_type <> 'Opening balance'")), 'ledger row rolled back');
     assert_eq(500, t_credit($m), 'credit rolled back');
     assert_same(false, t_pdo()->inTransaction());
 });

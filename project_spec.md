@@ -40,7 +40,8 @@ guest booking; `90001` is used similarly in admin and academy flows and as a pla
 `transaction_id` for academy bookings.
 
 ### transactions
-Append-only ledger. `transaction_title`, `assoc_transaction_id` (child -> parent),
+Append-only ledger. `credit_delta` is the signed effect on `members.credit` (0 for rows recorded for information only), and `actor_type` / `actor_id` / `actor_name` record who performed it.
+ `transaction_title`, `assoc_transaction_id` (child -> parent),
 `member_id`, `non_member_id`, `transaction_amount` (integer THB), `transaction_type`,
 `payment_type` (credit, cash, qr), `slip_url`, `transaction_note`.
 
@@ -88,6 +89,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 - Credit payment: instant approval, balance reduced immediately.
 - Bank transfer / QR: booking is "pending" with an uploaded slip (resized to max 1000px) until an admin approves it on the booking detail page.
 - Admin cash bookings are approved immediately and may be flagged "Not paid yet".
+- Credit adjustments: an admin changes a balance only through **Adjust credit** on the member page, which requires a written reason and records who did it. The credit field itself is read-only.
 - Credit refill: member uploads a slip, a `Credit refill` transaction is created and LINE notified; admin approves from the transaction page, optionally adjusting the amount to match the slip. Approval **adds** the amount to the current balance atomically and can only happen once per refill.
 - Admin "Save changes" on a booking edits court, date, time, status, coach and note only. It refuses to set "cancelled" (the Cancel buttons handle refunds and the waitlist) and refuses to move a booking onto an occupied court.
 
@@ -135,7 +137,6 @@ Key/value. Only key today: `allow_midnight_booking`.
 
 - Passwords are reversibly encrypted rather than hashed, so that staff can read them; the key on the server is the single secret protecting them.
 - Uploaded payment slips in `uploads/` are served without authentication.
-- Admin member edits write `members.credit` directly with no ledger row.
 - Cancellation handlers still write ledger rows and refunds without a transaction (booking and waitlist writes are transactional).
 - Business constants duplicated across PHP and JS.
 - Free-text enums with inconsistent values in production data.

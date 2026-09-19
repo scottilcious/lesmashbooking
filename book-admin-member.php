@@ -78,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
     require_once 'includes/pricing.php';
+    require_once 'includes/credit.php';
     include_once 'includes/booking-functions.php';
 
     $booking_type           = $_POST['booking_type'];
@@ -303,8 +304,8 @@ if( $check_duplicated > 0  ){
 
     // REDUCE CREDIT
     if( $payment_type == 'credit' && (float) $transaction_amount > 0 ){
-        $stmt = $pdo->prepare("UPDATE members SET credit = credit - ? WHERE id = ? ");
-        $result = $stmt->execute([$transaction_amount, $member_id]);
+        // Deduct and record the movement on the parent transaction row.
+        lsc_credit_move($pdo, (int) $member_id, -(int) $transaction_amount, (int) $transaction_id);
     }
 
         lsc_booking_commit($pdo, $date);

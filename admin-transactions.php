@@ -138,28 +138,9 @@ $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <?php
-$approve_credit = $_GET["approve_credit"] ?? null;
-$member_id = $_GET["member_id"] ?? null;
-$credit_amount = $_GET["credit_amount"] ?? null;
-$transaction_id = $_GET["transaction_id"] ?? null;
-
-if ($approve_credit == 'true' && $member_id && $credit_amount && $transaction_id):
-    try {
-        $transaction_type = 'Credit refill - Approved';
-        $stmt_ts = $pdo->prepare("UPDATE transactions SET transaction_type = ? WHERE transaction_id = ?");
-        $result_ts = $stmt_ts->execute([$transaction_type, $transaction_id]);
-
-        $stmt = $pdo->prepare("UPDATE members SET credit = credit + ? WHERE id = ?");
-        $result = $stmt->execute([$credit_amount, $member_id]);
-
-        $added_credit = "true";
-        $add_credit_message = "Credit added to the member successfully";
-
-    } catch (PDOException $e) {
-        $added_credit = "false";
-        $add_credit_message = "There is a problem adding credit. Please try again<br>" . $e->getMessage();
-    }
-endif;
+// The old GET approval path was removed: it took the amount straight from the URL,
+// could be replayed, and bypassed the checks in admin-approve-credit.php.
+// Approvals now go through admin-approve-credit.php only.
 ?>
 
 <?php if (($added_credit ?? '') == "true") { ?>

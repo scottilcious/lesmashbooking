@@ -4,6 +4,7 @@ $lsc_me = lsc_require_login();
 require 'config.php';
 require_once 'includes/functions.php';
 require_once 'includes/pricing.php';
+require_once 'includes/credit.php';
 require_once 'includes/member-functions.php';
 require_once 'includes/booking-functions.php';
 
@@ -98,6 +99,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
     } else {
         $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt_ts->execute([$cancelled_transaction_title, $user_id, "90002", $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+        $cancellation_transaction_id = (int) $pdo->lastInsertId();
     }
 
 
@@ -111,8 +113,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
     $refunded_to_credit = false;
     if ($is_refund_eligible && !$isNonMember && $eligible_payment) {
         $total_refund_amount = $transaction_amount + $guest_refund_amount;
-        $credit_stmt = $pdo->prepare("UPDATE members SET credit = credit + ? WHERE id = ?");
-        $credit_stmt->execute([$total_refund_amount, $user_id]);
+        // Court refund is recorded on the cancellation row; the guest refund gets its own row below.
+        lsc_credit_move($pdo, (int) $user_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
         $refunded_to_credit = true;
 
         //Guest extra player
@@ -123,6 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
 
             $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt_guest->execute([$guest_transaction_title, $user_id, "90002", $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+            lsc_credit_move($pdo, (int) $user_id, (int) $guest_refund_amount, (int) $pdo->lastInsertId());
         }
     }
 

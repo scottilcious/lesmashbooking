@@ -77,6 +77,24 @@ parent transaction row, one child row + booking per court-hour, credit deduction
 Any exception rolls everything back and renders `lsc_booking_render_conflict()` with HTTP 409.
 Two requests for the same date are serialised by the lock, so the second one sees the first one's rows.
 
+## Change a member's credit
+
+Only `includes/credit.php` may move a balance:
+
+```php
+lsc_credit_move($pdo, $memberId, -160, $transactionId);          // inside an open transaction
+lsc_credit_adjust($pdo, $memberId, 250, 'Cash top up');          // admin adjustment, own transaction
+```
+
+`lsc_credit_move()` updates `members.credit` and stamps `credit_delta` plus the actor on the row you pass,
+so the two can never drift. Pass the row that represents the movement: for a booking that is the parent
+`Booking_<id>` row, not a per-court child. Informational rows are simply never stamped and stay at 0.
+
+The actor comes from the session. Automated flows wrap themselves in `lsc_actor_force_system(true)`.
+
+The admin member page shows the balance read-only; it changes only via `admin-adjust-credit.php`,
+which requires a reason. `admin-save-member.php` deliberately ignores any posted `credit` value.
+
 ## Approve a credit refill (how it works)
 
 `check_member_credit.php` renders the approval panel inside `admin-view-transaction.php`; the admin may edit
@@ -188,6 +206,10 @@ Useful distribution checks: `booking_status`, `booking_type`, `daily_member_type
 - Confirm `DISABLE_NOTIFICATIONS` is `false` and `PASSWORD_ENCRYPTION_KEY` is set in the server's `config.local.php`.
 - After the first deploy of password encryption, run `php database/migrate-encrypt-passwords.php --apply` on the server.
 - Add a cron entry for `cron/waitlist-expire.php` every 5 minutes.
+- **Credit ledger:** run `php database/migrate-add-credit-ledger.php --apply` then
+  `php database/backfill-opening-balances.php --apply`. The first adds the columns and backfills what
+  can be inferred; the second records each member's unexplained balance as an opening balance so every
+  statement reconciles. Both have a dry run by default.
 - **Audit log exposure:** `logs/app.log` is downloadable over the web. After deploying, run
   `php scripts/migrate-logs.php --apply` to split it into guarded monthly files, then delete or move
   `logs/app.log`. Verify with `curl -I https://booking.lesmashclub.com/logs/app.log` (expect 404).

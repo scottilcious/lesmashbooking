@@ -325,7 +325,7 @@ test('decline by member: no charge, placeholder cancelled, next member offered',
     assert_eq('declined', t_row('wait_list', 'wait_list_id = ?', [$wa])['waitlist_status']);
     assert_eq(500, t_credit($a));
     assert_eq('cancelled', t_row('bookings', 'id = ?', [$offer['booking_id']])['booking_status']);
-    assert_eq(0, count(t_rows('transactions', "member_id = ? AND transaction_amount > 0", [$a])), 'ledger shows no charge');
+    assert_eq(0, count(t_rows('transactions', "member_id = ? AND transaction_amount > 0 AND transaction_type <> 'Opening balance'", [$a])), 'ledger shows no charge');
     assert_true($r['next'] !== null && $r['next']['member_id'] == $b, 'next member offered');
     assert_eq('0822222222', t_sms()[0][0]);
 });

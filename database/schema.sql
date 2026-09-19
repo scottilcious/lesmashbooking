@@ -81,8 +81,13 @@ CREATE TABLE `transactions` (
   `payment_type` varchar(255) DEFAULT NULL,
   `slip_url` varchar(255) DEFAULT NULL,
   `transaction_note` varchar(255) DEFAULT NULL,
+  `actor_type` varchar(20) DEFAULT NULL,
+  `actor_id` int(11) DEFAULT NULL,
+  `actor_name` varchar(255) DEFAULT NULL,
+  `credit_delta` int(11) NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`transaction_id`)
+  PRIMARY KEY (`transaction_id`),
+  KEY `member_credit` (`member_id`,`credit_delta`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `wait_list`;

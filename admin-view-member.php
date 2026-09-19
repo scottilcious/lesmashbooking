@@ -4,6 +4,7 @@ $lsc_me = lsc_require_admin('redirect');
 // Database connection
 require 'config.php';
 require_once 'includes/password.php';
+require_once 'includes/credit.php';
 $member_id = isset($_GET['member_id']) ? (int) $_GET['member_id'] : 0;
 $transaction_filter = $_GET['transaction_filter'] ?? 'all';
 $allowed_transaction_filters = ['all', 'bookings', 'credit', 'cancellation'];
@@ -230,7 +231,19 @@ function lsc_credit_transaction_where(): string
 
                         <div class="mt-3">
                             <label for="credit">Credit</label>
-                            <input class="form-control form-control-lg" type="number" name="credit" id="credit" value="<?php echo $members[0]['credit'];?>" />
+                            <div class="input-group input-group-lg">
+                                <input class="form-control form-control-lg bg-body-secondary" type="text" id="credit" value="<?= number_format((float) $members[0]['credit'], 2) ?>" readonly>
+                                <span class="input-group-text">THB</span>
+                                <button type="button" class="btn btn-primary" id="openAdjustCredit" data-bs-toggle="modal" data-bs-target="#adjustCreditModal">
+                                    <i class="ri-add-circle-line"></i> Adjust credit
+                                </button>
+                                <a class="btn btn-outline-primary" href="<?= 'admin-view-member.php?member_id=' . urlencode((string) $member_id) . '&transaction_filter=credit#credit-statement' ?>">
+                                    <i class="ri-file-list-3-line"></i> Credit activity
+                                </a>
+                            </div>
+                            <div class="form-text">
+                                The balance can only be changed through <b>Adjust credit</b>, so every change is recorded with a reason and shows in the credit activity.
+                            </div>
                         </div>
 
                         <hr>
@@ -271,7 +284,7 @@ function lsc_credit_transaction_where(): string
     <div class="container mb-5">
         <div class="row justify-content-center">
             <div class="col-12 col-md-10">
-                <h4>Member Transaction History</h4>
+                <h4 id="credit-statement">Member Transaction History</h4>
 
                 <?php
                     $base_url = 'admin-view-member.php?member_id=' . urlencode((string) $member_id);
@@ -492,7 +505,32 @@ function lsc_credit_transaction_where(): string
         });
         $(document).ready(function () {
 
-            $("#saveMember").click(function () {
+    
+        $("#submitAdjustCredit").click(function () {
+            const $btn = $(this);
+            $btn.prop("disabled", true);
+            $.ajax({
+                url: "admin-adjust-credit.php",
+                type: "POST",
+                data: {
+                    member_id: <?= (int) $member_id ?>,
+                    direction: $("input[name=adjust_direction]:checked").val(),
+                    amount: $("#adjust_amount").val(),
+                    reason: $("#adjust_reason").val()
+                },
+                complete: function (xhr) {
+                    $("#adjustCreditResult").html(xhr.responseText);
+                    if (xhr.status === 200) {
+                        $("#adjustCreditForm").hide();
+                        $btn.hide();
+                    } else {
+                        $btn.prop("disabled", false);
+                    }
+                }
+            });
+        });
+
+        $("#saveMember").click(function () {
                 let memberId = $(this).data("member-id");
                 let member_number = $('#member_number').val();
                 let first_name = $('#first_name').val();
@@ -507,7 +545,6 @@ function lsc_credit_transaction_where(): string
                 let last_renewed = $('#last_renewed').val();
                 /*let new_price = $('#new_price').val();
                 let discount = $('#discount').val();*/
-                let credit = $('#credit').val();
                 let member_note = $('#member_note').val();
                 let member_password = $('#member_password').val();
                 
@@ -533,7 +570,6 @@ function lsc_credit_transaction_where(): string
                             member_length: member_length,
                             member_expiration: member_expiration,
                             last_renewed: last_renewed,
-                            credit: credit,
                             member_note: member_note,
                             member_password: member_password
                         },
@@ -579,5 +615,49 @@ function lsc_credit_transaction_where(): string
 
         });
     </script>
+
+<!-- Adjust credit -->
+<div class="modal fade" id="adjustCreditModal" tabindex="-1" aria-labelledby="adjustCreditLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="adjustCreditLabel">Adjust credit</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-body-secondary">
+          <?= htmlspecialchars(trim(($members[0]['first_name'] ?? '') . ' ' . ($members[0]['last_name'] ?? ''))) ?>
+          &middot; current balance <b><?= number_format((float) $members[0]['credit'], 2) ?> THB</b>
+        </p>
+        <div id="adjustCreditResult"></div>
+        <div id="adjustCreditForm">
+          <div class="mb-3">
+            <label class="form-label">Direction</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="adjust_direction" id="adjust_add" value="add" checked>
+              <label class="btn btn-outline-success" for="adjust_add">Add credit</label>
+              <input type="radio" class="btn-check" name="adjust_direction" id="adjust_deduct" value="deduct">
+              <label class="btn btn-outline-danger" for="adjust_deduct">Deduct credit</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="adjust_amount" class="form-label">Amount (THB)</label>
+            <input type="number" min="1" step="1" class="form-control form-control-lg" id="adjust_amount" placeholder="0">
+          </div>
+          <div class="mb-3">
+            <label for="adjust_reason" class="form-label">Reason <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="adjust_reason" maxlength="200" placeholder="e.g. Cash top up at reception, correction for double charge">
+            <div class="form-text">Shown in the member's credit activity, so write something the next person will understand.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="submitAdjustCredit">Record adjustment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

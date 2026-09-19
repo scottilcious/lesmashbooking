@@ -5,6 +5,7 @@ $lsc_me = lsc_require_admin();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
+    require_once 'includes/credit.php';
 
     $transaction_id  = (int) ($_POST['add_credit_transaction_id'] ?? 0);
     $approved_amount = isset($_POST['approved_amount']) && $_POST['approved_amount'] !== '' ? (int) $_POST['approved_amount'] : null;
@@ -33,11 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($up->rowCount() !== 1) {
                     $error = 'This refill was approved by someone else a moment ago.';
                 } else {
-                    $mb = $pdo->prepare("UPDATE members SET credit = credit + ? WHERE id = ?");
-                    $mb->execute([$amount, $tx['member_id']]);
-                    $bal = $pdo->prepare("SELECT credit FROM members WHERE id = ?");
-                    $bal->execute([$tx['member_id']]);
-                    $new_balance = (float) $bal->fetchColumn();
+                    $new_balance = lsc_credit_move($pdo, (int) $tx['member_id'], (int) $amount, $transaction_id);
                 }
             }
         }

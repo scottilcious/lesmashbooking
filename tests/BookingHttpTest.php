@@ -28,7 +28,7 @@ test('http: member booking succeeds and writes ledger, booking and credit togeth
     $r = t_http_post('book-member.php', t_member_booking_payload($f, '1,2', '9-10am,10-11am', 320), $jar);
     assert_eq(200, $r['status'], strip_tags($r['body']));
     assert_eq(2, count(t_rows('bookings', 'member_id = ? AND booking_status = ?', [$f['a'], 'approved'])));
-    assert_eq(3, count(t_rows('transactions', 'member_id = ?', [$f['a']])), 'parent + 2 children');
+    assert_eq(3, count(t_rows('transactions', "member_id = ? AND transaction_type <> 'Opening balance'", [$f['a']])), 'parent + 2 children');
     assert_eq(680, t_credit($f['a']));
 });
 
@@ -39,7 +39,7 @@ test('http: member booking a slot someone holds is refused with nothing written'
     $r = t_http_post('book-member.php', t_member_booking_payload($f, '1,2', '9-10am,9-10am', 320), $jar);
     assert_true(str_contains($r['body'], 'just booked'), 'conflict message: ' . substr(strip_tags($r['body']), 0, 160));
     assert_eq(0, count(t_rows('bookings', 'member_id = ?', [$f['a']])), 'no booking for Ann, not even court 2');
-    assert_eq(0, count(t_rows('transactions', 'member_id = ?', [$f['a']])), 'no ledger rows');
+    assert_eq(0, count(t_rows('transactions', "member_id = ? AND transaction_type <> 'Opening balance'", [$f['a']])), 'no ledger rows');
     assert_eq(1000, t_credit($f['a']), 'no charge');
 });
 

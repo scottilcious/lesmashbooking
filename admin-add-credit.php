@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/auth.php';
 $lsc_me = lsc_require_admin('redirect');
 // Database connection
 require 'config.php';
+require_once 'includes/credit.php';
 ?>
 
 <!-- index.php -->
@@ -44,9 +45,6 @@ require 'config.php';
             try {
                 $pdo->beginTransaction();
 
-                $stmt = $pdo->prepare("UPDATE members SET credit= credit+? WHERE id = ?");
-                $result = $stmt->execute([$credit_amount, $member_id]);
-
                 $transaction_title = 'Admin credit add';
                 $transaction_type = 'Admin credit add';
                 $payment_type = 'credit';
@@ -57,6 +55,7 @@ require 'config.php';
 
                 $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt_ts->execute([$transaction_title, $member_id, $non_member_id, $non_member_info, $credit_amount, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+                $result = lsc_credit_move($pdo, (int) $member_id, (int) $credit_amount, (int) $pdo->lastInsertId()) !== null;
 
                 $pdo->commit();
     
