@@ -128,7 +128,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 ## 6. Request flow for a booking
 
 1. `index.php` renders the grid for today via `modules/time-table.php`.
-2. Date change -> AJAX POST to `check_availability.php` -> returns table rows.
+2. Date change -> AJAX POST to `check_availability.php`, which returns table rows only; both it and the initial render call `lsc_court_grid_rows()` in `includes/court-grid.php`.
 3. Checkbox changes -> `app.js` validates rules, builds `all_selected_courts` / `all_selected_times` CSVs and computes the fee client-side.
 4. "Make a booking" -> `app.js` picks the handler by role and booking type and POSTs multipart form data.
 5. Handler re-validates window, advance limit, duplicates, per-day limit and credit balance, uploads the slip, then inside one database transaction under a per-date lock re-checks the slots and credit, writes parent and child transactions, bookings and the credit deduction, commits, logs, sends LINE, and returns an HTML success fragment. Any failure rolls everything back and returns HTTP 409 with a message.

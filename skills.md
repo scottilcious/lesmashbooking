@@ -48,7 +48,7 @@ unlinked `extend-membership.php`.
 ## Change booking rules (hours per day, courts per slot)
 
 Server: `lsc_get_booking_rules_for_member_type()` in `includes/booking-functions.php`.
-Client: `setupBookingRules()` inside `check_availability.php` and `app.js`.
+Client: `setupBookingRules()` in `app.js` (the only copy).
 Submit-time re-check: `$max_hour_compare` in `book-member.php` and the count checks in `book-admin-member.php`.
 
 ## Change the advance window or booking hours
@@ -59,13 +59,22 @@ The midnight toggle is stored in `system_settings` under `allow_midnight_booking
 
 ## Close courts on specific dates
 
-Two hardcoded arrays, `$court_exempt_dates` and `$court_closed_dates`, exist in both
-`modules/time-table.php` and `check_availability.php`. Edit both.
+`LSC_GRID_PARTIAL_CLOSURE_DATES` (courts 1 to 4) and `LSC_GRID_FULL_CLOSURE_DATES` (all courts)
+at the top of `includes/court-grid.php`. One place, covering both the initial render and the refresh.
+
+## Change the booking grid
+
+`lsc_court_grid_rows($pdo, $date, $ctx)` in `includes/court-grid.php` draws the whole table body.
+`$ctx` takes `memberType` (what the viewer sees, and the non-member peak rule), `limitMemberType`
+(whose booking rules apply) and `selectedMemberId` (whose bookings count toward the waitlist quota).
+`modules/time-table.php` supplies the surrounding table; `check_availability.php` returns the rows
+alone for the AJAX refresh. Never add a `<script>` to that fragment: jQuery runs scripts in injected
+HTML, which is how an older copy of the rules used to overwrite the one in `app.js`.
 
 ## Add a new booking type (academy, tournament, ...)
 
 - Add to `$allowed_academy_booking_types` in `book-academy.php`.
-- Add a case in `get_admin_booking_type()` in `modules/time-table.php` and `check_availability.php`.
+- Add a case in `lsc_grid_booking_type_label()` in `includes/court-grid.php`.
 - Add the radio in `modules/admin-booking-menu.php`.
 
 ## How a booking is written

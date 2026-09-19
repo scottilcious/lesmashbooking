@@ -29,8 +29,9 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 | `includes/member-functions.php` | Timeslot to time conversion, date helpers, expiry check |
 | `menu.php` | Header include; also the session guard and defines `$userId`, `$memberType`, `$memberData` |
 | `index.php` | Booking page (grid + summary card) |
-| `modules/time-table.php` | Initial grid render for today |
-| `check_availability.php` | AJAX re-render of the grid for a chosen date, plus the client-side rule JS |
+| `includes/court-grid.php` | **The** booking grid: `lsc_court_grid_rows()` draws the 7x16 table body for a date |
+| `modules/time-table.php` | The table, header and legend around the grid |
+| `check_availability.php` | AJAX: returns grid rows only for a chosen date (no JavaScript) |
 | `book-member.php`, `book-non-member.php`, `book-admin-member.php`, `book-admin-non-member.php`, `book-academy.php` | Booking submit handlers, chosen by `app.js` |
 | `cancel_booking.php`, `admin-cancel-booking.php` | Cancellation, refunds, waitlist promotion |
 | `includes/booking-service.php` | Per-date lock + transaction for the `book-*.php` handlers: `lsc_booking_begin/commit/abort`, slot and credit re-checks, `LscBookingConflict` |
@@ -70,6 +71,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Use prepared statements. Never interpolate request data into SQL.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
 - Cancellations run in one transaction with the booking row locked (`SELECT ... FOR UPDATE`), and the waitlist offer runs only after the commit, because it sends SMS and LINE.
+- The booking grid is drawn only by `lsc_court_grid_rows()`. `check_availability.php` must never emit a `<script>`: jQuery executes scripts in injected HTML, which is how an older copy of the booking rules used to silently replace the one in `app.js`.
 - Booking writes go inside `lsc_booking_begin($pdo, $date)` ... `lsc_booking_commit()` from `includes/booking-service.php`, with `lsc_booking_assert_slots_free()` re-run inside. Throw `LscBookingConflict` to abort with a message; never `echo` an exception and carry on.
 - Preserve the existing HTML fragment response shape for AJAX endpoints unless you also update the caller in `app.js`.
 - Log user-visible state changes through `lsc_log()`. Never write to the log directory directly, and never rename a log file to a non-`.php` extension: the guard line is what stops it being downloaded.
@@ -77,5 +79,4 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 ## Known problems (do not "fix" silently; raise them)
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
-- Grid rendering is still duplicated between `modules/time-table.php`, `check_availability.php` and `app.js` (pricing is not).
 - `uploads/` (payment slips) is served without authentication; anyone with a URL can read a slip.
