@@ -69,6 +69,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Timezone is set once in `config.php`; do not call `date_default_timezone_set` elsewhere.
 - Use prepared statements. Never interpolate request data into SQL.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
+- Cancellations run in one transaction with the booking row locked (`SELECT ... FOR UPDATE`), and the waitlist offer runs only after the commit, because it sends SMS and LINE.
 - Booking writes go inside `lsc_booking_begin($pdo, $date)` ... `lsc_booking_commit()` from `includes/booking-service.php`, with `lsc_booking_assert_slots_free()` re-run inside. Throw `LscBookingConflict` to abort with a message; never `echo` an exception and carry on.
 - Preserve the existing HTML fragment response shape for AJAX endpoints unless you also update the caller in `app.js`.
 - Log user-visible state changes through `lsc_log()`. Never write to the log directory directly, and never rename a log file to a non-`.php` extension: the guard line is what stops it being downloaded.
@@ -77,5 +78,4 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
 - Grid rendering is still duplicated between `modules/time-table.php`, `check_availability.php` and `app.js` (pricing is not).
-- The cancellation handlers still write ledger rows and refunds as separate statements (no transaction yet).
 - `uploads/` (payment slips) is served without authentication; anyone with a URL can read a slip.

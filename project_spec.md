@@ -94,7 +94,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 - Admin "Save changes" on a booking edits court, date, time, status, coach and note only. It refuses to set "cancelled" (the Cancel buttons handle refunds and the waitlist) and refuses to move a booking onto an occupied court.
 
 ### Cancellation and refunds
-- Member self-cancel: full refund to credit only if 48 hours or more before the slot start and the booking was paid by credit or QR. Guest fees refunded alongside. Otherwise no refund.
+- Member self-cancel: full refund to credit only if 48 hours or more before the slot start and the booking was paid by credit or QR. Guest fees refunded alongside. Otherwise no refund. The status change, ledger row and refund commit together; cancelling twice refunds once.
 - Guest self-cancel: never auto-refunded; told to contact admin.
 - Admin cancel: optional credit refund; "rain/pollution" option refunds full or half amount regardless of timing, and does not trigger waitlist promotion.
 
@@ -137,7 +137,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 
 - Passwords are reversibly encrypted rather than hashed, so that staff can read them; the key on the server is the single secret protecting them.
 - Uploaded payment slips in `uploads/` are served without authentication.
-- Cancellation handlers still write ledger rows and refunds without a transaction (booking and waitlist writes are transactional).
+- All money paths are transactional. Bookings use a per-date lock; cancellations lock the booking row.
 - Business constants duplicated across PHP and JS.
 - Free-text enums with inconsistent values in production data.
 - No staging environment or deployment pipeline. Tests cover the waitlist service, password storage and authorization (`tests/`).

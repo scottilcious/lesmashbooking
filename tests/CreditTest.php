@@ -237,3 +237,73 @@ test('http: the member page links to the activity page and no longer has a credi
     assert_true(str_contains($body, 'id="openAdjustCredit"'), 'adjust button sits beside the balance');
     assert_true(str_contains($body, 'readonly'), 'balance is read-only');
 });
+
+/* ---------------------------------------------------------------- cancellation atomicity */
+
+function t_cancel_fixture(): array
+{
+    $date = date('Y-m-d', strtotime('+3 days'));
+    $m = t_member(['first_name' => 'Cara', 'member_number' => 9001, 'member_password' => 'pwC', 'credit' => 500]);
+    $admin = t_member(['first_name' => 'Root', 'member_number' => 9003, 'member_password' => 'pwAdm', 'member_type' => 'admin']);
+    t_pdo()->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, transaction_amount, transaction_type, payment_type, credit_delta, actor_type) VALUES ('Booking_c', ?, 90001, 160, 'booking (member)', 'credit', -160, 'member')")->execute([$m]);
+    $tx = (int) t_pdo()->lastInsertId();
+    t_pdo()->prepare('UPDATE members SET credit = credit - 160 WHERE id = ?')->execute([$m]);
+    $bk = t_booking(['court' => 1, 'date' => $date, 'timeslot' => '9-10am', 'member_id' => $m, 'transaction_id' => $tx, 'payment' => 'credit']);
+    return compact('date', 'm', 'admin', 'bk', 'tx');
+}
+
+test('http: cancelling twice refunds once', function () {
+    $f = t_cancel_fixture();
+    $jar = t_http_login('9001', 'pwC');
+    assert_eq(200, t_http_post('cancel_booking.php', ['booking_id' => $f['bk']], $jar)['status']);
+    assert_eq(500, t_credit($f['m']), 'refunded back to 500');
+
+    $again = t_http_post('cancel_booking.php', ['booking_id' => $f['bk']], $jar);
+    assert_true(in_array($again['status'], [403, 409], true), 'second attempt refused, got ' . $again['status']);
+    assert_eq(500, t_credit($f['m']), 'not refunded twice');
+    assert_eq(1, count(t_rows('transactions', "member_id = ? AND credit_delta > 0 AND transaction_type = 'cancelled'", [$f['m']])), 'one refund row');
+    assert_eq(500, lsc_credit_ledger_total(t_pdo(), $f['m']), 'ledger still reconciles');
+});
+
+test('http: an admin cancellation with refund keeps booking, ledger and balance in step', function () {
+    $f = t_cancel_fixture();
+    $adm = t_http_login('9003', 'pwAdm');
+    $r = t_http_post('admin-cancel-booking.php', [
+        'booking_id' => $f['bk'], 'credit_refund' => 'true', 'cancel_special' => 'false', 'cancel_half' => 'false',
+        'transaction_id' => $f['tx'], 'member_id' => $f['m'], 'non_member_id' => 90002,
+    ], $adm);
+    assert_eq(200, $r['status'], strip_tags($r['body']));
+    assert_eq('cancelled', t_row('bookings', 'id = ?', [$f['bk']])['booking_status']);
+    assert_eq(500, t_credit($f['m']), 'refunded');
+    assert_eq(500, lsc_credit_ledger_total(t_pdo(), $f['m']), 'ledger reconciles');
+    $refund = t_row('transactions', "member_id = ? AND credit_delta > 0 AND transaction_type = 'cancelled'", [$f['m']]);
+    assert_eq('admin', $refund['actor_type'], 'recorded against the admin who did it');
+    assert_eq(160, (int) $refund['transaction_amount'], 'the row states the amount actually refunded');
+    assert_true(!str_contains((string) $refund['transaction_title'], 'No refund'), 'and is not labelled "No refund"');
+    assert_true(str_contains((string) $refund['transaction_note'], 'refunded'), 'note says refunded');
+
+    $again = t_http_post('admin-cancel-booking.php', [
+        'booking_id' => $f['bk'], 'credit_refund' => 'true', 'cancel_special' => 'false', 'cancel_half' => 'false',
+        'transaction_id' => $f['tx'], 'member_id' => $f['m'], 'non_member_id' => 90002,
+    ], $adm);
+    assert_eq(409, $again['status'], 'already cancelled');
+    assert_eq(500, t_credit($f['m']), 'no second refund');
+});
+
+test('http: a cancellation that cannot complete leaves the booking and balance untouched', function () {
+    $f = t_cancel_fixture();
+    // Point the booking at a transaction row that does not exist, so the refund lookup finds nothing.
+    t_pdo()->prepare('UPDATE bookings SET transaction_id = 0 WHERE id = ?')->execute([$f['bk']]);
+    $before_credit = t_credit($f['m']);
+    $jar = t_http_login('9001', 'pwC');
+    $r = t_http_post('cancel_booking.php', ['booking_id' => $f['bk']], $jar);
+    // Either it completes with a zero refund, or it fails; either way nothing may be half-written.
+    $booking = t_row('bookings', 'id = ?', [$f['bk']]);
+    $ledger = lsc_credit_ledger_total(t_pdo(), $f['m']);
+    assert_eq($ledger, t_credit($f['m']), 'balance and ledger agree whatever happened');
+    if ($booking['booking_status'] === 'cancelled') {
+        assert_true($r['status'] === 200, 'a completed cancellation reports success');
+    } else {
+        assert_eq($before_credit, t_credit($f['m']), 'a failed cancellation refunds nothing');
+    }
+});

@@ -47,120 +47,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cancellation_note = 'admin-cancelled';
     }
 
-    //Cancel booking 
+    // Everything that changes state runs in one transaction, so a failure cannot leave
+    // a cancelled booking without its refund, or a refund without a record.
+    $result = false;
     try {
+        $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ?");
-        $result = $stmt->execute([$cancellation_note, $booking_id]);
-
-    }catch (PDOException $e) {
-        echo $e->getMessage();
-    }
-
-
-    //Create new transaction with updated information and note if cancel due to rain 
-    if( $cancel_special == 'true' && $cancel_half == 'false' ){
-
-        $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot;
-        $transaction_type = 'cancelled-rain';
-        $transaction_note = 'cancelled by admin - due to rain/pollution';
-        $non_member_info = 'N/A';
-        $this_transaction_price = $transaction_amount;
-        $payment_type = 'credit';
-        $slip_url = '';
-
-        $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-        $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
-        $cancellation_transaction_id = (int) $pdo->lastInsertId();
-
-        //Guest extra player
-        if($booking_extra_player >= 1){
-
-            $guest_transaction_title = 'Refunded guest transaction';
-            $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player);
-            $guest_transaction_note = 'Refunded guest transaction';
-
-            $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
-            $guest_transaction_id = (int) $pdo->lastInsertId();
-
+        // Re-read under a row lock so two admins cannot both cancel and both refund.
+        $lock = $pdo->prepare("SELECT booking_status FROM bookings WHERE id = ? FOR UPDATE");
+        $lock->execute([$booking_id]);
+        $current_status = $lock->fetchColumn();
+        if ($current_status === false || $current_status === 'cancelled') {
+            $pdo->rollBack();
+            http_response_code(409);
+            ?>
+            <div class="error-message text-center text-danger">
+                <span class="fs-2"><i class="ri-error-warning-fill"></i></span><br>
+                <p>This booking has already been cancelled.</p>
+                <hr>
+                <a href="admin-view-booking.php?booking_id=<?php echo (int) $booking_id; ?>" class="btn btn-primary">Back to booking</a>
+            </div>
+            <?php
+            exit;
         }
 
-    }elseif( $cancel_special == 'true' && $cancel_half == 'true'  ){
+        //Cancel booking 
+        try {
 
-        $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot . ' (Half refunded)';
-        $transaction_type = 'cancelled-rain-half';
-        $transaction_note = 'cancelled by admin - due to rain/pollution (half refunded)';
-        $non_member_info = 'N/A';
-        $this_transaction_price = $transaction_amount/2;
-        $payment_type = 'credit';
-        $slip_url = '';
+            $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ?");
+            $result = $stmt->execute([$cancellation_note, $booking_id]);
 
-        $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-        $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
-        $cancellation_transaction_id = (int) $pdo->lastInsertId();
-
-
-        //Guest extra player
-        if($booking_extra_player >= 1){
-
-            $guest_transaction_title = 'Refunded guest transaction';
-            $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player) / 2;
-            $guest_transaction_note = 'Refunded guest transaction';
-
-            $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
-            $guest_transaction_id = (int) $pdo->lastInsertId();
-
+        }catch (PDOException $e) {
+            throw $e; // handled by the outer transaction
         }
 
-    }else{
-        $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot . ' (No refund)';
-        $transaction_type = 'cancelled';
-        $transaction_note = 'cancelled by admin';
-        $non_member_info = 'N/A';
-        $this_transaction_price = 0;
-        $payment_type = 'credit';
-        $slip_url = '';
 
-        $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        //Create new transaction with updated information and note if cancel due to rain 
+        if( $cancel_special == 'true' && $cancel_half == 'false' ){
 
-        $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
-        $cancellation_transaction_id = (int) $pdo->lastInsertId();
+            $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot;
+            $transaction_type = 'cancelled-rain';
+            $transaction_note = 'cancelled by admin - due to rain/pollution';
+            $non_member_info = 'N/A';
+            $this_transaction_price = $transaction_amount;
+            $payment_type = 'credit';
+            $slip_url = '';
+
+            $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+            $cancellation_transaction_id = (int) $pdo->lastInsertId();
+
+            //Guest extra player
+            if($booking_extra_player >= 1){
+
+                $guest_transaction_title = 'Refunded guest transaction';
+                $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player);
+                $guest_transaction_note = 'Refunded guest transaction';
+
+                $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+                $guest_transaction_id = (int) $pdo->lastInsertId();
+
+            }
+
+        }elseif( $cancel_special == 'true' && $cancel_half == 'true'  ){
+
+            $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot . ' (Half refunded)';
+            $transaction_type = 'cancelled-rain-half';
+            $transaction_note = 'cancelled by admin - due to rain/pollution (half refunded)';
+            $non_member_info = 'N/A';
+            $this_transaction_price = $transaction_amount/2;
+            $payment_type = 'credit';
+            $slip_url = '';
+
+            $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+            $cancellation_transaction_id = (int) $pdo->lastInsertId();
+
+
+            //Guest extra player
+            if($booking_extra_player >= 1){
+
+                $guest_transaction_title = 'Refunded guest transaction';
+                $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player) / 2;
+                $guest_transaction_note = 'Refunded guest transaction';
+
+                $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt_guest->execute([$guest_transaction_title, $member_id, $non_member_id, $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+                $guest_transaction_id = (int) $pdo->lastInsertId();
+
+            }
+
+        }else{
+            $this_transaction_title = 'Cancelled booking for ' . $booking_date_format . ', Court: ' . $booking_court . ', Time: ' . $booking_timeslot . ' (No refund)';
+            $transaction_type = 'cancelled';
+            $transaction_note = 'cancelled by admin';
+            $non_member_info = 'N/A';
+            $this_transaction_price = 0;
+            $payment_type = 'credit';
+            $slip_url = '';
+
+            $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $stmt_ts->execute([$this_transaction_title, $member_id, $non_member_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+            $cancellation_transaction_id = (int) $pdo->lastInsertId();
     
+        }
+
+        //Refund Credit
+        if( ( $credit_refund == 'true' || $cancel_special == 'true' ) && !empty($member_id) && $member_id != "0" && $member_id != "90001" && $member_id != "90002" && $booking_payment_remark != 'Not paid yet' ){
+
+            //Create transaction records
+            if( $cancel_half == 'true'){
+                $transaction_amount = $transaction_amount/2;
+                $guest_refund_amount = $guest_refund_amount/2;
+            }
+
+            $total_refund_amount = $transaction_amount + $guest_refund_amount;
+
+            try {
+
+                // The plain-cancel branch labels its row "(No refund)" before we know whether the
+                // admin ticked refund. Make the row say what actually happened.
+                if (!empty($cancellation_transaction_id)) {
+                    $pdo->prepare("UPDATE transactions SET transaction_amount = ?, transaction_title = REPLACE(transaction_title, ' (No refund)', ''), transaction_note = ? WHERE transaction_id = ?")
+                        ->execute([(int) $transaction_amount, 'cancelled by admin (refunded)', (int) $cancellation_transaction_id]);
+                }
+
+                // Court refund on the cancellation row, guest refund on its own row, so the two add up.
+                lsc_credit_move($pdo, (int) $member_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
+                if ($guest_refund_amount > 0) {
+                    lsc_credit_move($pdo, (int) $member_id, (int) $guest_refund_amount, (int) ($guest_transaction_id ?? 0));
+                }
+
+            }catch (PDOException $e) {
+                throw $e; // handled by the outer transaction
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        lsc_log('Admin Cancel Booking Failed', "Booking ID: $booking_id. " . get_class($e) . ': ' . $e->getMessage());
+        http_response_code(500);
+        ?>
+        <div class="error-message text-center text-danger">
+            <span class="fs-2"><i class="ri-error-warning-fill"></i></span><br>
+            <p>The cancellation could not be completed. Nothing was changed. Please try again.</p>
+            <hr>
+            <a href="admin-view-booking.php?booking_id=<?php echo (int) $booking_id; ?>" class="btn btn-primary">Back to booking</a>
+        </div>
+        <?php
+        exit;
     }
 
-    //Offer the freed court to the first member on the waitlist. Rain/pollution cancellations do not free a playable court.
+    // Only once committed: offer the freed court to the waitlist. Rain/pollution
+    // cancellations do not free a playable court, so they do not trigger an offer.
     if ($result && $cancellation_note == 'admin-cancelled') {
         lsc_waitlist_offer_slot($pdo, (int) $booking_court, $booking_date, $booking_timeslot);
     }
 
-    //Refund Credit
-    if( ( $credit_refund == 'true' || $cancel_special == 'true' ) && !empty($member_id) && $member_id != "0" && $member_id != "90001" && $member_id != "90002" && $booking_payment_remark != 'Not paid yet' ){
-
-        //Create transaction records
-        if( $cancel_half == 'true'){
-            $transaction_amount = $transaction_amount/2;
-            $guest_refund_amount = $guest_refund_amount/2;
-        }
-
-        $total_refund_amount = $transaction_amount + $guest_refund_amount;
-
-        try {
-
-            // Court refund on the cancellation row, guest refund on its own row, so the two add up.
-            lsc_credit_move($pdo, (int) $member_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
-            if ($guest_refund_amount > 0) {
-                lsc_credit_move($pdo, (int) $member_id, (int) $guest_refund_amount, (int) ($guest_transaction_id ?? 0));
-            }
-
-        }catch (PDOException $e) {
-            echo $e->getMessage();
-        }
-
-    }
 
 
 

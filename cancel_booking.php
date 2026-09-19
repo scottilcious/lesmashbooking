@@ -53,81 +53,125 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
     $transaction_note = "cancelled by member";
     $guest_refund_amount = lsc_price_guests((int) $this_booking_extra_player);
 
-    //Cancel booking
-    if ($isNonMember) {
-        $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ? AND non_member_id = ?");
-        $result = $stmt->execute([$transaction_note, $booking_id, $user_id]);
-    } else {
-        $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ? AND member_id = ?");
-        $result = $stmt->execute([$transaction_note, $booking_id, $user_id]);
-    }
+    // Everything that changes state runs in one transaction: a failure can no longer
+    // leave a cancelled booking without its refund, or a refund without a record.
+    $result = false;
+    $total_refund_amount = 0;
+    $refunded_to_credit = false;
+    try {
+        $pdo->beginTransaction();
 
-    //Create cancellation transaction record 
-    $cancelled_transaction_title = 'Cancelled by member for booking ' . $readable_date . ', Court: ' . $this_booking_court . ', Time: ' . $this_booking_timeslot;
+        // Re-read under a row lock so two tabs cannot both cancel and both refund.
+        $lock = $pdo->prepare("SELECT booking_status FROM bookings WHERE id = ? FOR UPDATE");
+        $lock->execute([$booking_id]);
+        $current_status = $lock->fetchColumn();
+        if ($current_status === false || $current_status === 'cancelled') {
+            $pdo->rollBack();
+            http_response_code(409);
+            ?>
+            <div class="error-message text-center text-danger">
+                <span class="fs-2"><i class="ri-error-warning-fill"></i></span><br>
+                <p>This booking has already been cancelled.</p>
+                <button type="button" class="btn btn-primary" onclick="location.reload()">Back</button>
+            </div>
+            <?php
+            exit;
+        }
+
+        //Cancel booking
+        if ($isNonMember) {
+            $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ? AND non_member_id = ?");
+            $result = $stmt->execute([$transaction_note, $booking_id, $user_id]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE bookings SET booking_status = 'cancelled', booking_note = ? WHERE id = ? AND member_id = ?");
+            $result = $stmt->execute([$transaction_note, $booking_id, $user_id]);
+        }
+
+        //Create cancellation transaction record 
+        $cancelled_transaction_title = 'Cancelled by member for booking ' . $readable_date . ', Court: ' . $this_booking_court . ', Time: ' . $this_booking_timeslot;
     
-    // Determine refund eligibility and transaction values
-    $this_booking_payment = isset($booking[0]['payment']) ? strtolower(trim($booking[0]['payment'])) : '';
-    $eligible_payment = ($this_booking_payment === 'credit' || $this_booking_payment === 'qr');
+        // Determine refund eligibility and transaction values
+        $this_booking_payment = isset($booking[0]['payment']) ? strtolower(trim($booking[0]['payment'])) : '';
+        $eligible_payment = ($this_booking_payment === 'credit' || $this_booking_payment === 'qr');
     
-    if ($is_refund_eligible && !$isNonMember) {
-        if ($eligible_payment) {
+        if ($is_refund_eligible && !$isNonMember) {
+            if ($eligible_payment) {
+                $transaction_type = 'cancelled';
+                $transaction_note = 'cancelled by member (refunded)';
+                $this_transaction_price = $transaction_amount;
+            } else {
+                $transaction_type = 'cancelled';
+                $transaction_note = 'cancelled by member';
+                $this_transaction_price = 0;
+            }
+        } elseif ($is_refund_eligible && $isNonMember) {
             $transaction_type = 'cancelled';
-            $transaction_note = 'cancelled by member (refunded)';
-            $this_transaction_price = $transaction_amount;
+            $transaction_note = 'cancelled by non-member (contact admin for refund)';
+            $this_transaction_price = 0;
         } else {
             $transaction_type = 'cancelled';
-            $transaction_note = 'cancelled by member';
+            $transaction_note = $isNonMember ? 'cancelled by non-member' : 'cancelled by member';
             $this_transaction_price = 0;
         }
-    } elseif ($is_refund_eligible && $isNonMember) {
-        $transaction_type = 'cancelled';
-        $transaction_note = 'cancelled by non-member (contact admin for refund)';
-        $this_transaction_price = 0;
-    } else {
-        $transaction_type = 'cancelled';
-        $transaction_note = $isNonMember ? 'cancelled by non-member' : 'cancelled by member';
-        $this_transaction_price = 0;
-    }
     
-    $non_member_info = !empty($booking[0]['non_member_info']) ? $booking[0]['non_member_info'] : 'N/A';
-    $payment_type = 'credit';
-    $slip_url = '';
+        $non_member_info = !empty($booking[0]['non_member_info']) ? $booking[0]['non_member_info'] : 'N/A';
+        $payment_type = 'credit';
+        $slip_url = '';
 
-    if ($isNonMember) {
-        $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt_ts->execute([$cancelled_transaction_title, "90002", $user_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
-    } else {
-        $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt_ts->execute([$cancelled_transaction_title, $user_id, "90002", $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
-        $cancellation_transaction_id = (int) $pdo->lastInsertId();
+        if ($isNonMember) {
+            $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt_ts->execute([$cancelled_transaction_title, "90002", $user_id, $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+        } else {
+            $stmt_ts = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt_ts->execute([$cancelled_transaction_title, $user_id, "90002", $non_member_info, $this_transaction_price, $transaction_type, $payment_type, $slip_url, $transaction_note]);
+            $cancellation_transaction_id = (int) $pdo->lastInsertId();
+        }
+
+
+        //Refund Credit 
+        $total_refund_amount = 0;
+        $refunded_to_credit = false;
+        if ($is_refund_eligible && !$isNonMember && $eligible_payment) {
+            $total_refund_amount = $transaction_amount + $guest_refund_amount;
+            // Court refund is recorded on the cancellation row; the guest refund gets its own row below.
+            lsc_credit_move($pdo, (int) $user_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
+            $refunded_to_credit = true;
+
+            //Guest extra player
+            if ($guest_refund_amount > 0) {
+                $guest_transaction_title = 'Refunded guest transaction';
+                $guest_transaction_amount = $guest_refund_amount;
+                $guest_transaction_note = 'Refunded guest transaction';
+
+                $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt_guest->execute([$guest_transaction_title, $user_id, "90002", $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
+                lsc_credit_move($pdo, (int) $user_id, (int) $guest_refund_amount, (int) $pdo->lastInsertId());
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        lsc_log('Cancel Booking Failed', "Booking ID: $booking_id. " . get_class($e) . ': ' . $e->getMessage());
+        http_response_code(500);
+        ?>
+        <div class="error-message text-center text-danger">
+            <span class="fs-2"><i class="ri-error-warning-fill"></i></span><br>
+            <p>The cancellation could not be completed. Nothing was changed. Please try again.</p>
+            <button type="button" class="btn btn-primary" onclick="location.reload()">Back</button>
+        </div>
+        <?php
+        exit;
     }
 
-
-    //Offer the freed court to the first member on the waitlist (no-op if nobody is waiting or the slot is too close)
+    // Only once the cancellation is committed: offer the freed court to the waitlist.
+    // This opens its own transaction and sends SMS/LINE, so it must not run on a rolled-back cancel.
     if ($result) {
         lsc_waitlist_offer_slot($pdo, (int) $this_booking_court, $this_booking_date, $this_booking_timeslot);
     }
 
-    //Refund Credit 
-    $total_refund_amount = 0;
-    $refunded_to_credit = false;
-    if ($is_refund_eligible && !$isNonMember && $eligible_payment) {
-        $total_refund_amount = $transaction_amount + $guest_refund_amount;
-        // Court refund is recorded on the cancellation row; the guest refund gets its own row below.
-        lsc_credit_move($pdo, (int) $user_id, (int) $transaction_amount, (int) ($cancellation_transaction_id ?? 0));
-        $refunded_to_credit = true;
-
-        //Guest extra player
-        if ($guest_refund_amount > 0) {
-            $guest_transaction_title = 'Refunded guest transaction';
-            $guest_transaction_amount = $guest_refund_amount;
-            $guest_transaction_note = 'Refunded guest transaction';
-
-            $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt_guest->execute([$guest_transaction_title, $user_id, "90002", $non_member_info, $guest_transaction_amount, $transaction_type, $payment_type, $slip_url, $guest_transaction_note]);
-            lsc_credit_move($pdo, (int) $user_id, (int) $guest_refund_amount, (int) $pdo->lastInsertId());
-        }
-    }
 
     //Send LINE 
     if ($result) {
