@@ -2,6 +2,7 @@
 require_once __DIR__ . '/includes/auth.php';
 $lsc_me = lsc_require_admin('redirect');
 require 'config.php';
+require_once 'includes/logging.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -24,90 +25,50 @@ require 'config.php';
 <?php
 include "menu.php";
 
-if (!isset($_SESSION["logged_in"]) || $_SESSION['member_type'] !== 'admin') {
-    header("Location: login.php");
-    exit();
-}
-
-$log_file = __DIR__ . '/logs/app.log';
-$log_entries = [];
-
-if (file_exists($log_file)) {
-    $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines !== false) {
-        foreach ($lines as $line) {
-            $data = json_decode($line, true);
-            if ($data) {
-                $log_entries[] = $data;
-            }
-        }
-    }
-}
-
-// Reverse chronological order
-$log_entries = array_reverse($log_entries);
-
-// Filters
-$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+$search     = isset($_GET['search']) ? trim($_GET['search']) : '';
 $start_date = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
-$end_date = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+$end_date   = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+$month      = isset($_GET['month']) ? trim($_GET['month']) : '';
+$page       = isset($_GET['page']) && is_numeric($_GET['page']) ? (int) $_GET['page'] : 1;
 
-$filtered_entries = [];
-foreach ($log_entries as $entry) {
-    // Search filter
-    if ($search_query !== '') {
-        $matches_search = (
-            stripos($entry['action'] ?? '', $search_query) !== false ||
-            stripos($entry['username'] ?? '', $search_query) !== false ||
-            stripos($entry['description'] ?? '', $search_query) !== false
-        );
-        if (!$matches_search) {
-            continue;
-        }
-    }
+$result   = lsc_log_query(compact('search', 'start_date', 'end_date', 'month') + ['page' => $page, 'limit' => 50]);
+$entries  = $result['entries'];
+$months   = $result['months'];
+$selected = $month !== '' ? $month : ($start_date === '' && $end_date === '' ? ($months[0] ?? '') : '');
 
-    // Date filter
-    if (isset($entry['timestamp'])) {
-        $entry_date = substr($entry['timestamp'], 0, 10); // Y-m-d
-        if ($start_date !== '' && $entry_date < $start_date) {
-            continue;
-        }
-        if ($end_date !== '' && $entry_date > $end_date) {
-            continue;
-        }
-    }
-
-    $filtered_entries[] = $entry;
+function lsc_log_query_string(array $over = []): string
+{
+    $params = array_merge([
+        'search'     => $_GET['search'] ?? '',
+        'start_date' => $_GET['start_date'] ?? '',
+        'end_date'   => $_GET['end_date'] ?? '',
+        'month'      => $_GET['month'] ?? '',
+    ], $over);
+    return '?' . http_build_query(array_filter($params, static fn($v) => $v !== '' && $v !== null));
 }
 
-// Pagination setup
-$limit = 50;
-$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
-$offset = ($page - 1) * $limit;
-$total_rows = count($filtered_entries);
-$total_pages = ceil($total_rows / $limit);
-$paginated_entries = array_slice($filtered_entries, $offset, $limit);
-
-function paginate_logs($totalPages, $currentPage) {
-    $maxPagesToShow = 12;
-    $pagination = [];
-    if ($totalPages <= 1) return $pagination;
-
-    $pagination[] = 1;
-    $start = max(2, $currentPage - 4);
-    $end = min($totalPages - 1, $currentPage + 4);
-
-    if ($start > 2) {
-        $pagination[] = "...";
+function lsc_log_pagination(int $totalPages, int $currentPage): array
+{
+    if ($totalPages <= 1) {
+        return [];
     }
-    for ($i = $start; $i <= $end; $i++) {
-        $pagination[] = $i;
+    $out = [1];
+    $from = max(2, $currentPage - 4);
+    $to   = min($totalPages - 1, $currentPage + 4);
+    if ($from > 2) { $out[] = '...'; }
+    for ($i = $from; $i <= $to; $i++) { $out[] = $i; }
+    if ($to < $totalPages - 1) { $out[] = '...'; }
+    $out[] = $totalPages;
+    return $out;
+}
+
+function lsc_log_month_label(string $ym): string
+{
+    if ($ym === 'legacy') {
+        return 'Before rotation (app.log)';
     }
-    if ($end < $totalPages - 1) {
-        $pagination[] = "...";
-    }
-    $pagination[] = $totalPages;
-    return $pagination;
+    $d = DateTimeImmutable::createFromFormat('Y-m-d', $ym . '-01');
+    return $d ? $d->format('F Y') : $ym;
 }
 ?>
 
@@ -122,15 +83,24 @@ function paginate_logs($totalPages, $currentPage) {
         <div class="card-body">
             <h4 class="card-title mb-3">Filters</h4>
             <form method="GET" action="admin-logs.php" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="search" class="form-label">Search Keyword</label>
-                    <input type="text" class="form-control" id="search" name="search" placeholder="Search actor, action or details..." value="<?= htmlspecialchars($search_query) ?>">
+                    <input type="text" class="form-control" id="search" name="search" placeholder="Search actor, action or details..." value="<?= htmlspecialchars($search) ?>">
                 </div>
                 <div class="col-md-3">
+                    <label for="month" class="form-label">Month</label>
+                    <select class="form-select" id="month" name="month">
+                        <?php foreach ($months as $ym): ?>
+                            <option value="<?= htmlspecialchars($ym) ?>" <?= $selected === $ym ? 'selected' : '' ?>><?= htmlspecialchars(lsc_log_month_label($ym)) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">A date range below searches across months.</div>
+                </div>
+                <div class="col-md-2">
                     <label for="start_date" class="form-label">Start Date</label>
                     <input type="text" class="form-control datepicker" id="start_date" name="start_date" placeholder="YYYY-MM-DD" value="<?= htmlspecialchars($start_date) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="end_date" class="form-label">End Date</label>
                     <input type="text" class="form-control datepicker" id="end_date" name="end_date" placeholder="YYYY-MM-DD" value="<?= htmlspecialchars($end_date) ?>">
                 </div>
@@ -141,6 +111,15 @@ function paginate_logs($totalPages, $currentPage) {
             </form>
         </div>
     </div>
+
+    <p class="text-body-secondary">
+        <?= number_format($result['total']) ?> entr<?= $result['total'] === 1 ? 'y' : 'ies' ?>
+        <?php if ($start_date !== '' || $end_date !== ''): ?>
+            in the selected date range
+        <?php elseif ($selected !== ''): ?>
+            in <?= htmlspecialchars(lsc_log_month_label($selected)) ?>
+        <?php endif; ?>
+    </p>
 
     <div class="table-responsive">
         <table class="table table-striped table-bordered text-center align-middle">
@@ -153,14 +132,13 @@ function paginate_logs($totalPages, $currentPage) {
                 </tr>
             </thead>
             <tbody>
-                <?php if (count($paginated_entries) > 0): ?>
-                    <?php foreach ($paginated_entries as $entry): 
-                        // Determine badge class for action types
+                <?php if (count($entries) > 0): ?>
+                    <?php foreach ($entries as $entry):
                         $action = htmlspecialchars($entry['action'] ?? '');
                         $badge_class = 'bg-secondary';
                         if (stripos($action, 'booking') !== false) {
                             $badge_class = 'bg-success';
-                        } elseif (stripos($action, 'cancel') !== false) {
+                        } elseif (stripos($action, 'cancel') !== false || stripos($action, 'declin') !== false || stripos($action, 'expire') !== false) {
                             $badge_class = 'bg-danger';
                         } elseif (stripos($action, 'credit') !== false || stripos($action, 'refill') !== false) {
                             $badge_class = 'bg-primary';
@@ -184,34 +162,19 @@ function paginate_logs($totalPages, $currentPage) {
         </table>
     </div>
 
-    <!-- pagination -->
-    <?php if ($total_pages > 1): ?>
+    <?php if ($result['pages'] > 1): ?>
         <div class="text-center mt-4">
             <nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">
-                    <?php
-                    $pages = paginate_logs($total_pages, $page);
-                    foreach ($pages as $pg) {
-                        $queryString = '?page=' . $pg;
-                        if ($search_query !== '') {
-                            $queryString .= '&search=' . urlencode($search_query);
-                        }
-                        if ($start_date !== '') {
-                            $queryString .= '&start_date=' . urlencode($start_date);
-                        }
-                        if ($end_date !== '') {
-                            $queryString .= '&end_date=' . urlencode($end_date);
-                        }
-
-                        if ($pg === "...") {
-                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                        } elseif ($pg == $page) {
-                            echo '<li class="page-item active"><span class="page-link">' . $pg . '</span></li>';
-                        } else {
-                            echo '<li class="page-item"><a class="page-link" href="' . $queryString . '">' . $pg . '</a></li>';
-                        }
-                    }
-                    ?>
+                    <?php foreach (lsc_log_pagination($result['pages'], $result['page']) as $pg): ?>
+                        <?php if ($pg === '...'): ?>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <?php elseif ($pg == $result['page']): ?>
+                            <li class="page-item active"><span class="page-link"><?= $pg ?></span></li>
+                        <?php else: ?>
+                            <li class="page-item"><a class="page-link" href="<?= htmlspecialchars(lsc_log_query_string(['page' => $pg])) ?>"><?= $pg ?></a></li>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </ul>
             </nav>
         </div>
@@ -222,10 +185,7 @@ function paginate_logs($totalPages, $currentPage) {
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
     $(document).ready(function() {
-        flatpickr(".datepicker", {
-            dateFormat: "Y-m-d",
-            allowInput: true
-        });
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", allowInput: true });
     });
 </script>
 </body>

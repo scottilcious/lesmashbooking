@@ -112,7 +112,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 
 - **LINE**: broadcast to the club's official account on every new booking, waitlist join, cancellation and credit refill (Thai text with a deep link to the admin page).
 - **SMS**: via SMSMKT, only for waitlist offers.
-- **Audit log**: `logs/app.log`, JSON lines with timestamp, actor, action, description. Viewed on `admin-logs.php` with keyword and date filters, 50 per page.
+- **Audit log**: `logs/app-YYYY-MM.log.php`, one file per month, JSON lines with timestamp, actor, action, description. Each file opens with a `<?php exit; ?>` guard so it cannot be downloaded. Viewed on `admin-logs.php` with month, keyword and date filters, 50 per page; the default view reads only the current month.
 - All external sends are suppressed when `DISABLE_NOTIFICATIONS` is true.
 
 ## 5. Screens
@@ -134,8 +134,9 @@ Key/value. Only key today: `allow_midnight_booking`.
 ## 7. Known gaps and risks
 
 - Passwords are reversibly encrypted rather than hashed, so that staff can read them; the key on the server is the single secret protecting them.
+- Uploaded payment slips in `uploads/` are served without authentication.
+- Admin member edits write `members.credit` directly with no ledger row.
 - Cancellation handlers still write ledger rows and refunds without a transaction (booking and waitlist writes are transactional).
 - Business constants duplicated across PHP and JS.
 - Free-text enums with inconsistent values in production data.
-- Audit log read fully into memory on every admin view.
 - No staging environment or deployment pipeline. Tests cover the waitlist service, password storage and authorization (`tests/`).

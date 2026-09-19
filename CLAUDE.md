@@ -17,6 +17,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
+| `includes/logging.php` | Audit log: monthly rotation, web-access guard, `lsc_log_write()` and `lsc_log_query()` |
 | `includes/pricing.php` | **All prices.** Constants + `lsc_price_court/guests/daily_fee/coach()`; `menu.php` publishes them to JS as `window.LSC_PRICING` |
 | `includes/auth.php` | `lsc_require_login/member/guest/admin()`: identity from the session; every handler and admin page calls one |
 | `includes/password.php` | Encrypted password storage: `lsc_password_verify/encrypt/decrypt/for_storage` |
@@ -36,7 +37,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 | `tests/` | `php tests/run.php` runs the suite against `DB_TEST_DATABASE` |
 | `admin-*.php` | Admin screens and AJAX handlers |
 | `app.js` | All shared front-end logic (grid selection, fee calc, submit routing, member search) |
-| `logs/app.log` | JSON-lines audit log written by `lsc_log()` (not committed) |
+| `logs/app-YYYY-MM.log.php` | JSON-lines audit log, one file per month (not committed). Each starts with a `<?php exit; ?>` guard because `logs/` sits in the web root |
 | `uploads/` | Payment slip images (not committed) |
 
 Superseded but still present: `extend-membership.php` (unlinked). The old `book.php`, `register.php`,
@@ -66,10 +67,12 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 - Do not commit `config.php` credentials, `logs/`, `uploads/`, or SQL dumps.
 - Booking writes go inside `lsc_booking_begin($pdo, $date)` ... `lsc_booking_commit()` from `includes/booking-service.php`, with `lsc_booking_assert_slots_free()` re-run inside. Throw `LscBookingConflict` to abort with a message; never `echo` an exception and carry on.
 - Preserve the existing HTML fragment response shape for AJAX endpoints unless you also update the caller in `app.js`.
-- Log user-visible state changes through `lsc_log()`.
+- Log user-visible state changes through `lsc_log()`. Never write to the log directory directly, and never rename a log file to a non-`.php` extension: the guard line is what stops it being downloaded.
 
 ## Known problems (do not "fix" silently; raise them)
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
 - Grid rendering is still duplicated between `modules/time-table.php`, `check_availability.php` and `app.js` (pricing is not).
 - The cancellation handlers still write ledger rows and refunds as separate statements (no transaction yet).
+- `uploads/` (payment slips) is served without authentication; anyone with a URL can read a slip.
+- `admin-save-member.php` writes `members.credit` directly with no ledger row, which makes balances impossible to reconcile.

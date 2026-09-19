@@ -154,9 +154,20 @@ Stored encrypted in `members.member_password` as `enc1:<base64>` (AES-256-GCM, k
 
 ## Add or read audit log entries
 
-Call `lsc_log($action, $description)` from `includes/functions.php`. Entries are JSON lines in
-`logs/app.log`. `admin-logs.php` loads the whole file into memory; consider rotating the file
-when it grows past a few tens of MB.
+Write with `lsc_log($action, $description)`. It appends to `logs/app-YYYY-MM.log.php`, creating the
+month's file with a `<?php exit; ?>` guard line so a direct HTTP request returns nothing.
+
+Read with `lsc_log_query(['search' => ..., 'start_date' => ..., 'end_date' => ..., 'month' => ...,
+'page' => 1, 'limit' => 50])`, which returns `entries`, `total`, `pages` and the available `months`.
+With no date range it reads only the newest month. `admin-logs.php` is the only caller.
+
+To inspect on the server, ignore the first line:
+
+```bash
+tail -n +2 logs/app-2026-09.log.php | tail -50
+```
+
+Set `LOG_DIRECTORY` in `config.local.php` to a path outside the web root if the hosting allows it.
 
 ## Send notifications
 
@@ -177,4 +188,7 @@ Useful distribution checks: `booking_status`, `booking_type`, `daily_member_type
 - Confirm `DISABLE_NOTIFICATIONS` is `false` and `PASSWORD_ENCRYPTION_KEY` is set in the server's `config.local.php`.
 - After the first deploy of password encryption, run `php database/migrate-encrypt-passwords.php --apply` on the server.
 - Add a cron entry for `cron/waitlist-expire.php` every 5 minutes.
+- **Audit log exposure:** `logs/app.log` is downloadable over the web. After deploying, run
+  `php scripts/migrate-logs.php --apply` to split it into guarded monthly files, then delete or move
+  `logs/app.log`. Verify with `curl -I https://booking.lesmashclub.com/logs/app.log` (expect 404).
 - Never upload `logs/`, `uploads/`, or a `.git` directory to the web root.

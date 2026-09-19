@@ -4,6 +4,8 @@ if (!defined('DB_HOSTNAME')) {
     require_once __DIR__ . '/../config.php';
 }
 
+require_once __DIR__ . '/logging.php';
+
 function lsc_format_date($type, $input_date){
     if( $type == 'db_to_readable'){
 
@@ -94,21 +96,12 @@ function lsc_log($action, $description, $username = null) {
         }
     }
     
-    $log_dir = __DIR__ . '/../logs';
-    if (!is_dir($log_dir)) {
-        mkdir($log_dir, 0755, true);
-    }
-    
-    $log_file = $log_dir . '/app.log';
-    $timestamp = date('Y-m-d H:i:s');
-    $log_entry = json_encode([
-        'timestamp' => $timestamp,
-        'username' => $username,
-        'action' => $action,
-        'description' => $description
-    ], JSON_UNESCAPED_UNICODE) . "\n";
-    
-    file_put_contents($log_file, $log_entry, FILE_APPEND);
+    lsc_log_write([
+        'timestamp'   => date('Y-m-d H:i:s'),
+        'username'    => $username,
+        'action'      => $action,
+        'description' => $description,
+    ]);
 }
 
 function lsc_send_line_broadcast($message, $accessToken) {

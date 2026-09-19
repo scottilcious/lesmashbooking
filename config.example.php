@@ -25,3 +25,7 @@ define('SMSMKT_SENDER', 'Lesmashclub');
 // Password encryption key: 64 hex chars (32 bytes). Generate: php -r "echo bin2hex(random_bytes(32));"
 // BACK THIS UP. Without it, encrypted member passwords cannot be read and must be reset by an admin.
 define('PASSWORD_ENCRYPTION_KEY', '');
+
+// Optional: absolute path to the audit log directory. Leave undefined to use ./logs.
+// Set this to a directory OUTSIDE the web root if the hosting allows it.
+// define('LOG_DIRECTORY', '/home/youruser/lsc-logs');
