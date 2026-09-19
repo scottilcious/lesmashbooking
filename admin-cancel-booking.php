@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/auth.php';
 $lsc_me = lsc_require_admin();
 require 'config.php';
 require_once 'includes/functions.php';
+require_once 'includes/pricing.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $booking_timeslot = $booking_data[0]['timeslot'];
     $booking_extra_player = $booking_data[0]['coach_extra_player'];
     $booking_payment_remark = $booking_data[0]['payment_remark'];
-    $guest_refund_amount = max(0, (int) $booking_extra_player) * 200;
+    $guest_refund_amount = lsc_price_guests((int) $booking_extra_player);
 
     //Booking cancellation note
     if( $cancel_special == 'true' && $cancel_half == 'false' ){
@@ -75,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if($booking_extra_player >= 1){
 
             $guest_transaction_title = 'Refunded guest transaction';
-            $guest_transaction_amount = $booking_extra_player*200;
+            $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player);
             $guest_transaction_note = 'Refunded guest transaction';
 
             $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -102,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if($booking_extra_player >= 1){
 
             $guest_transaction_title = 'Refunded guest transaction';
-            $guest_transaction_amount = ($booking_extra_player*200)/2;
+            $guest_transaction_amount = lsc_price_guests((int) $booking_extra_player) / 2;
             $guest_transaction_note = 'Refunded guest transaction';
 
             $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");

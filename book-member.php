@@ -4,6 +4,7 @@ $lsc_me = lsc_require_member();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
+    require_once 'includes/pricing.php';
     include_once 'includes/booking-functions.php';
 
     if (!lsc_is_booking_window_open_for_member('member')) {
@@ -275,7 +276,7 @@ if( $check_more_than_2hours > $max_hour_compare ){
             if($extra_player >= 1){
 
                 $guest_transaction_title = 'Guest transaction';
-                $guest_transaction_amount = $extra_player*200;
+                $guest_transaction_amount = lsc_price_guests((int) $extra_player);
                 $guest_transaction_note = 'Guest transaction';
 
                 $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -300,11 +301,7 @@ if( $check_more_than_2hours > $max_hour_compare ){
             $court_numb         = $court_value;
             $time_val           = $times[$key];
 
-            if( $time_val == '6-7pm' || $time_val == '7-8pm' || $time_val == '8-9pm' || $time_val == '9-10pm' ){
-                $this_transaction_price = 280;
-            }else{
-                $this_transaction_price = 160;
-            }
+            $this_transaction_price = lsc_price_court($time_val);
 
 
             //If waitlist

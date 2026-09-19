@@ -4,6 +4,7 @@ $lsc_me = lsc_require_guest();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
+    require_once 'includes/pricing.php';
     include_once 'includes/booking-functions.php';
 
     if (!lsc_is_booking_window_open_for_member('non-member')) {
@@ -245,11 +246,7 @@ if( $check_duplicated > 0  ){
             $court_numb         = $court_value;
             $time_val           = $times[$key];
 
-            if( $time_val == '6-7pm' || $time_val == '7-8pm' || $time_val == '8-9pm' || $time_val == '9-10pm' ){
-                $this_transaction_price = 280;
-            }else{
-                $this_transaction_price = 160;
-            }
+            $this_transaction_price = lsc_price_court($time_val);
             
 
             //If waitlist

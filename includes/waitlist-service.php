@@ -29,14 +29,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/pricing.php';   // LSC_COURT_FEE_*, LSC_GUEST_FEE, LSC_COACH_FEE, LSC_DAILY_FEES
 
 const LSC_WAITLIST_OFFER_TTL      = 2 * 3600; // seconds to confirm an offer
 const LSC_WAITLIST_OFFER_MIN_LEAD = 2 * 3600; // slot must start at least this far in the future
-const LSC_COURT_FEE_DAY           = 160;
-const LSC_COURT_FEE_EVENING       = 280;
-const LSC_GUEST_FEE               = 200;   // per extra player
-const LSC_COACH_FEE               = 750;   // assistant coach, guest bookings only
-const LSC_DAILY_FEES              = ['individual' => 500, 'couple' => 800, 'family' => 950, 'junior' => 350, '1 adult 1 child' => 650];
 const LSC_SENTINEL_IDS            = [0, 90001, 90002];
 const LSC_ADMIN_URL               = 'https://booking.lesmashclub.com';
 
@@ -81,21 +77,17 @@ function lsc_waitlist_notify(string $channel, string $to, string $message): void
 
 function lsc_waitlist_slot_start(string $date, string $timeslot): ?DateTimeImmutable
 {
-    $hours = [
-        '6-7am' => 6, '7-8am' => 7, '8-9am' => 8, '9-10am' => 9, '10-11am' => 10, '11am-12pm' => 11,
-        '12-1pm' => 12, '1-2pm' => 13, '2-3pm' => 14, '3-4pm' => 15, '4-5pm' => 16, '5-6pm' => 17,
-        '6-7pm' => 18, '7-8pm' => 19, '8-9pm' => 20, '9-10pm' => 21,
-    ];
-    if (!isset($hours[$timeslot])) {
+    $hour = lsc_timeslot_hour($timeslot);
+    if ($hour === null) {
         return null;
     }
-    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', sprintf('%s %02d:00:00', $date, $hours[$timeslot]));
+    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', sprintf('%s %02d:00:00', $date, $hour));
     return $dt ?: null;
 }
 
 function lsc_waitlist_slot_price(string $timeslot): int
 {
-    return in_array($timeslot, ['6-7pm', '7-8pm', '8-9pm', '9-10pm'], true) ? LSC_COURT_FEE_EVENING : LSC_COURT_FEE_DAY;
+    return lsc_price_court($timeslot);
 }
 
 /** waitlist_note is a CSV written by the booking forms: name,email,phone,daily_member_type,coach,extra_players */
@@ -121,12 +113,9 @@ function lsc_waitlist_is_guest_entry(array $w): bool
 function lsc_waitlist_total_price(string $timeslot, ?string $note, bool $isGuest = false): int
 {
     $n = lsc_waitlist_parse_note($note);
-    $price = lsc_waitlist_slot_price($timeslot) + $n['extra_players'] * LSC_GUEST_FEE;
+    $price = lsc_price_court($timeslot) + lsc_price_guests($n['extra_players']);
     if ($isGuest) {
-        $price += LSC_DAILY_FEES[strtolower($n['daily_member_type'])] ?? LSC_DAILY_FEES['individual'];
-        if (stripos($n['coach'], 'coach') !== false) {
-            $price += LSC_COACH_FEE;
-        }
+        $price += lsc_price_daily_fee($n['daily_member_type']) + lsc_price_coach($n['coach']);
     }
     return $price;
 }

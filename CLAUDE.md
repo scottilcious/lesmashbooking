@@ -17,6 +17,7 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
+| `includes/pricing.php` | **All prices.** Constants + `lsc_price_court/guests/daily_fee/coach()`; `menu.php` publishes them to JS as `window.LSC_PRICING` |
 | `includes/auth.php` | `lsc_require_login/member/guest/admin()`: identity from the session; every handler and admin page calls one |
 | `includes/password.php` | Encrypted password storage: `lsc_password_verify/encrypt/decrypt/for_storage` |
 | `database/migrate-encrypt-passwords.php` | One-off CLI migration of plaintext passwords (idempotent) |
@@ -45,7 +46,7 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 
 - **Sentinel IDs.** `member_id` and `non_member_id` are both NOT NULL in practice. `90002` in `non_member_id` means "this is a member booking"; `90002` in `member_id` means "this is a guest booking". `90001` appears in the same role in some handlers and as the placeholder `transaction_id` for academy bookings. Never treat these as real IDs.
 - **Timeslots are strings** exactly as in the `$times` array: `6-7am`, `11am-12pm`, `12-1pm`, `9-10pm`. Convert with `get_time_from_timeslot()`.
-- **Pricing is hardcoded** in several places (PHP and JS): 160 THB before 6pm, 280 THB from 6pm, 200 THB per guest. Change all copies together or centralise first.
+- **Prices live only in `includes/pricing.php`.** PHP calls `lsc_price_court($timeslot)` etc.; JavaScript reads `window.LSC_PRICING` (published by `menu.php`) through `lsc_court_price()` in `app.js`. Never write a price literal anywhere else.
 - **Two transaction rows per booking.** A parent row titled `Booking_<member_id>` holds the total; one child row per court-hour references it via `assoc_transaction_id`. `bookings.transaction_id` points at the child row.
 - **Member credit** is a running balance in `members.credit`, updated alongside a transaction row. Keep both in step.
 - **Cancelled bookings** stay in the table with `booking_status = 'cancelled'`; every availability query must exclude them.
@@ -70,5 +71,5 @@ Superseded but still present: `extend-membership.php` (unlinked). The old `book.
 ## Known problems (do not "fix" silently; raise them)
 
 - Passwords are encrypted (reversible, by design so reception staff can read them), not hashed. Anyone with both the DB and the server key can read them.
-- Grid rendering and pricing logic are duplicated across three files.
+- Grid rendering is still duplicated between `modules/time-table.php`, `check_availability.php` and `app.js` (pricing is not).
 - The cancellation handlers still write ledger rows and refunds as separate statements (no transaction yet).

@@ -1,7 +1,8 @@
+<?php require_once __DIR__ . '/../includes/pricing.php'; ?>
 <?php if ( $memberType != 'non-member'  ) : ?>
 <div class="additional-players">
     <div class="coach-wrapper mt-1 coach-extra-player-wrapper active" id="extraPlayer">
-        <label for="extra_player_qty">Amount of guests <br>(Guest fee : +200THB/person)<br></label>
+        <label for="extra_player_qty">Amount of guests <br>(Guest fee : +<?= LSC_GUEST_FEE ?>THB/person)<br></label>
             <div class="row">
                 <div class="col-12 col-md-3">
                 <div class="input-group input-group-lg">
@@ -28,14 +29,14 @@
         <div class="card-body">
             <div class="coach-wrapper">
                 <label for="coach_option">
-                    <input type="checkbox" name="coach[]" id="coach_option" value="Assistant coach" data-coaching-price="750">
-                    Assistant coach (750THB)
+                    <input type="checkbox" name="coach[]" id="coach_option" value="Assistant coach" data-coaching-price="<?= LSC_COACH_FEE ?>">
+                    Assistant coach (<?= LSC_COACH_FEE ?>THB)
                 </label>
             </div>
             <div class="coach-wrapper mt-1 coach-extra-player-wrapper" id="extraPlayer">
                 <label for="extra_player" class="mt-3">
                     <input type="checkbox" name="extra_player[]" id="extra_player" value="Extra player">
-                    Extra Player (+200THB/person)
+                    Extra Player (+<?= LSC_GUEST_FEE ?>THB/person)
                 </label>
                 <div class="row">
                     <div class="col-6 col-md-3">

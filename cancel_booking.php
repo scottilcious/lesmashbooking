@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/auth.php';
 $lsc_me = lsc_require_login();
 require 'config.php';
 require_once 'includes/functions.php';
+require_once 'includes/pricing.php';
 require_once 'includes/member-functions.php';
 require_once 'includes/booking-functions.php';
 
@@ -49,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["booking_id"])) {
     $transaction = $ts_stmt->fetchAll(PDO::FETCH_ASSOC);
     $transaction_amount = !empty($transaction) ? $transaction[0]['transaction_amount'] : 0;
     $transaction_note = "cancelled by member";
-    $guest_refund_amount = max(0, (int) $this_booking_extra_player) * 200;
+    $guest_refund_amount = lsc_price_guests((int) $this_booking_extra_player);
 
     //Cancel booking
     if ($isNonMember) {

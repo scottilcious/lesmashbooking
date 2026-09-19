@@ -77,6 +77,7 @@ function lsc_enforce_admin_member_booking_limits(PDO $pdo, $date, $member_id, $m
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require 'config.php';
     require_once 'includes/functions.php';
+    require_once 'includes/pricing.php';
     include_once 'includes/booking-functions.php';
 
     $booking_type           = $_POST['booking_type'];
@@ -241,7 +242,7 @@ if( $check_duplicated > 0  ){
             if($extra_player >= 1){
 
                 $guest_transaction_title = 'Guest transaction';
-                $guest_transaction_amount = $extra_player*200;
+                $guest_transaction_amount = lsc_price_guests((int) $extra_player);
                 $guest_transaction_note = 'Guest transaction';
 
                 $stmt_guest = $pdo->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, non_member_info, transaction_amount, transaction_type, payment_type, slip_url, transaction_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -266,11 +267,7 @@ if( $check_duplicated > 0  ){
             $court_numb         = $court_value;
             $time_val           = $times[$key];
 
-            if( $time_val == '6-7pm' || $time_val == '7-8pm' || $time_val == '8-9pm' || $time_val == '9-10pm' ){
-                $this_transaction_price = 280;
-            }else{
-                $this_transaction_price = 160;
-            }
+            $this_transaction_price = lsc_price_court($time_val);
 
 
             //If waitlist

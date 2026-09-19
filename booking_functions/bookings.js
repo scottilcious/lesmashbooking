@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const localUIDConfirm = $userId.val();
 
     // Check low credit & phone validation
-    if( isChecked && val.includes('waitlist') &&  $memberCurrentCreditChk.val() < 260 ){
+    if( isChecked && val.includes('waitlist') &&  $memberCurrentCreditChk.val() < ((window.LSC_PRICING && window.LSC_PRICING.courtEvening) || 280) ){
       //modalCreditElModal.show();
       modalWaitlistCreditLowAlert.classList.remove('d-none');
       //modalWaitlistPhoneConfirmWrapper.classList.add('d-none');

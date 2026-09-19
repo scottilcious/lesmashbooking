@@ -340,7 +340,7 @@
 
 ?>
 <p class="fs-4 mb-0">Select Court and Time</p>
-<p>(6:00am - 6:00pm: 160THB/hr , 6:00pm - 10:00pm 280THB/hr)</p>
+<p>(6:00am - 6:00pm: <?= LSC_COURT_FEE_DAY ?>THB/hr , 6:00pm - 10:00pm <?= LSC_COURT_FEE_EVENING ?>THB/hr)</p>
 <?php if( $memberType != 'admin') { ?>
 <div class="card court-layout text-center mb-3">
     <div class="card-body">

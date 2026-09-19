@@ -281,52 +281,23 @@ if( document.getElementById("bookingForm") ){
     
 }   
 
+//PRICES: single source of truth is includes/pricing.php, published by menu.php as window.LSC_PRICING.
+function lsc_pricing(){
+    return window.LSC_PRICING || { courtDay: 160, courtEvening: 280, guestFee: 200, coachFee: 750,
+        eveningSlots: ['6-7pm','7-8pm','8-9pm','9-10pm'], dailyFees: {} };
+}
+function lsc_court_price(timeslot){
+    const p = lsc_pricing();
+    return p.eveningSlots.indexOf(String(timeslot).trim()) !== -1 ? p.courtEvening : p.courtDay;
+}
+
 //CALCULATE COURT BOOKING FEE BASED ON SELECTED TIME
 function calc_court_booking_fee(selected_time){
-    let check_today_date_jan1 = new Date();
-    let jan1_2026 = new Date('2026-01-01');
-    let current_booking_type = document.getElementById("booking_type").value;
-    let = court_booking_fee = 160;
-    /*
-    if (check_today_date_jan1 >= jan1_2026) {
-        let = court_booking_fee = 160;
-    }else{
-        let = court_booking_fee = 140;
+    const booking_type = document.getElementById("booking_type").value;
+    if( booking_type == 'member booking' || booking_type == 'non-member'){
+        return lsc_court_price(selected_time);
     }
-    */
-
-    console.log("calc_" + current_booking_type);
-
-    if( current_booking_type == 'member booking' || current_booking_type == 'non-member'){
-        
-        if( selected_time == '6-7pm' || selected_time == '7-8pm' || selected_time == '8-9pm' || selected_time == '9-10pm' ){
-            court_booking_fee = 280;
-            /*
-            if (check_today_date_jan1 >= jan1_2026) {
-                court_booking_fee = 280;
-            }else{
-                court_booking_fee = 260;
-            }*/
-            
-        }else{
-            court_booking_fee = 160;
-            /*
-            if (check_today_date_jan1 >= jan1_2026) {
-                court_booking_fee = 160;
-            }else{
-                court_booking_fee = 140;
-            }*/
-            
-        }
-
-    }else{
-        court_booking_fee = 0;
-    }
-
-    console.log("calc_court_booking_fee" + court_booking_fee);
-
-    return court_booking_fee;
-
+    return 0;
 }
 
 
@@ -476,46 +447,9 @@ function check_waitlist_array(waitlist_array){
     return result_check_waitlist_array;
 }
 
-//CHECK TIME AND PRICE 
+//CHECK TIME AND PRICE
 function get_price_from_timeslot(court, timeslot){
-    let check_today_date_jan1 = new Date();
-    let jan1_2026 = new Date('2026-01-01');
-    let timeslot_price = 160;
-    /*if (check_today_date_jan1 >= jan1_2026) {
-        let timeslot_price = 160;
-    }else{
-        let timeslot_price = 140;
-    }*/
-    
-    if( court != 'waitlist' ){
-        if( (timeslot == '6-7pm' || timeslot == '7-8pm' || timeslot == '8-9pm' || timeslot == '9-10pm' ) ){
-            timeslot_price = 280;
-            /*
-            if (check_today_date_jan1 >= jan1_2026) {
-                timeslot_price = 280;
-            }else{
-               timeslot_price = 260; 
-            }
-            */
-            
-        }else{
-            timeslot_price = 160;
-            /*
-            if (check_today_date_jan1 >= jan1_2026) {
-                timeslot_price = 160;
-            }else{
-                timeslot_price = 140;
-            }
-            */
-            
-        }
-    }else{
-        timeslot_price = 0;
-    }
-
-    //console.log(timeslot_price);
-
-    return timeslot_price;
+    return court == 'waitlist' ? 0 : lsc_court_price(timeslot);
 }
 
 
@@ -564,7 +498,7 @@ function calculate_all_booking_fees(){
     
     if( extra_player_amount != null){
         
-        let calc_extra_player = parseInt(extra_player_amount) * parseInt(200);
+        let calc_extra_player = parseInt(extra_player_amount) * lsc_pricing().guestFee;
 
         if( booking_type == 'non-member'){
             acccum_extra_player_fees = parseInt(calc_extra_player*all_checked_court_time_length);

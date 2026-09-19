@@ -223,7 +223,7 @@ if( $member_expiry_date_passed == true){
                                 <div class="booking-summary-fee">
                                     <small class="text-body-tertiary">Total booking fee</small><br>
                                     <span class="fs-4 fw-bold text-primary" id="SummaryBookingFee">
-                                        <?php echo ( $memberType == 'non-member' || $param_booking_type == 'non-member')? '500.00': '0'; ?>
+                                        <?php echo ( $memberType == 'non-member' || $param_booking_type == 'non-member')? number_format(lsc_price_daily_fee('individual'), 2) : '0'; ?>
                                     </span> <span class="fs-6 text-body-tertiary">THB</span>
                                     <input type="hidden" name="firstBookingFee" id="firstBookingFee" value="0">
                                     <input type="hidden" name="secondBookingFee" id="secondBookingFee" value="0">
@@ -541,9 +541,9 @@ if( $member_expiry_date_passed == true){
             </p>
 
             <ul class="mb-0">
-              <li><strong>Off Peak time (6AM - 6PM):</strong> 160 THB</li>
-              <li><strong>Peak time (6PM - 10PM):</strong> 280 THB</li>
-              <li><strong>Assistant coach fee:</strong> 750 THB</li>
+              <li><strong>Off Peak time (6AM - 6PM):</strong> <?= LSC_COURT_FEE_DAY ?> THB</li>
+              <li><strong>Peak time (6PM - 10PM):</strong> <?= LSC_COURT_FEE_EVENING ?> THB</li>
+              <li><strong>Assistant coach fee:</strong> <?= LSC_COACH_FEE ?> THB</li>
             </ul>
 
           </div>

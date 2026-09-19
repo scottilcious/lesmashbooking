@@ -27,17 +27,23 @@ Pass a filter to run one file: `php tests/run.php Waitlist`.
 
 ## Change a price
 
-Court fee (160 / 280) and guest fee (200) are hardcoded in:
+Edit the constants at the top of `includes/pricing.php` and nothing else:
 
-- `check_availability.php` (`calc_court_booking_fee`, `get_price_from_timeslot`)
-- `book-member.php`, `book-non-member.php`, `book-admin-member.php`, `book-admin-non-member.php`
-- `includes/waitlist-service.php` (`LSC_COURT_FEE_*`, `LSC_GUEST_FEE`, `LSC_COACH_FEE`, `LSC_DAILY_FEES`)
-- `booking_functions/bookings.js` (low-credit threshold)
-- `modules/time-table.php` (display text)
-- `modules/select-coach-option.php` (guest fee label)
+```php
+const LSC_COURT_FEE_DAY     = 160;  // 06:00-18:00
+const LSC_COURT_FEE_EVENING = 280;  // 18:00-22:00
+const LSC_GUEST_FEE         = 200;  // per extra player
+const LSC_COACH_FEE         = 750;  // assistant coach, guest bookings
+const LSC_DAILY_FEES        = [...]; // guest daily membership
+```
 
-Daily membership prices for non-members are `data-type-price` attributes in `modules/select-member-type.php`.
-Change every copy in one commit.
+Everything downstream follows: the booking handlers, the waitlist service, the cancellation refunds,
+the labels on the booking page, and the browser's fee calculator (`menu.php` emits the constants as
+`window.LSC_PRICING`; `app.js` and the inline script in `check_availability.php` read it via
+`lsc_court_price()`). Run `php tests/run.php Pricing` afterwards.
+
+Prices NOT in this module: membership renewal amounts, which are hardcoded `<option>` values in the
+unlinked `extend-membership.php`.
 
 ## Change booking rules (hours per day, courts per slot)
 

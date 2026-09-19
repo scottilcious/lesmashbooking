@@ -12,6 +12,7 @@ if (!isset($_SESSION['logged_in']) ) {
 }
 
 include_once 'includes/functions.php';
+require_once 'includes/pricing.php';
 
 $userId = $_SESSION['user_id'];
 $memberNumber = $_SESSION['member_number'];
@@ -32,6 +33,7 @@ $memberPhone = $memberData['member_phone'];
 
 ?>
 
+<script>window.LSC_PRICING = <?= lsc_pricing_json() ?>;</script>
 <header class="p-3 border-bottom text-bg-light" <?= $_SESSION['member_number'] ?>>
     <div class="container">
       <div class="row align-items-center">
