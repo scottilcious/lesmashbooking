@@ -95,6 +95,17 @@ The actor comes from the session. Automated flows wrap themselves in `lsc_actor_
 The admin member page shows the balance read-only; it changes only via `admin-adjust-credit.php`,
 which requires a reason. `admin-save-member.php` deliberately ignores any posted `credit` value.
 
+## Member credit activity
+
+`admin-member-credit.php?member_id=N` lists every row where `credit_delta <> 0`, newest first, with the
+running balance walked back from `members.credit`. It reconciles when `SUM(credit_delta)` equals the
+balance, and says so plainly either way. Reached from the **Credit activity** button beside the balance
+on the member page. Rendering helpers (`lsc_credit_description()`, `lsc_member_transaction_badge()`)
+live in `includes/credit.php` so there is one implementation.
+
+Historical rows show "Unknown" for the actor where it could not be inferred, mostly bookings. Anything
+written after the ledger went in is exact.
+
 ## Approve a credit refill (how it works)
 
 `check_member_credit.php` renders the approval panel inside `admin-view-transaction.php`; the admin may edit

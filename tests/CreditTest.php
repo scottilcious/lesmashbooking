@@ -148,3 +148,92 @@ test('http: saving the member form can no longer change the balance', function (
     assert_eq(500, (float) $row['credit'], 'credit ignored even though it was posted');
     assert_eq(0, count(t_rows('transactions', "transaction_type <> 'Opening balance'")), 'no silent ledger row either');
 });
+
+test('http: a member booking records the member as the actor', function () {
+    $f = t_credit_fixture();
+    t_pdo()->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('allow_midnight_booking', '1')");
+    $date = date('Y-m-d', strtotime('+2 days'));
+    $jar = t_http_login('8001', 'pwM');
+    $r = t_http_post('book-member.php', ['booking_type' => 'member booking', 'date' => $date, 'daily_member_type' => 'individual',
+        'all_selected_courts' => '1', 'all_selected_times' => '9-10am', 'transaction_amount' => 160, 'payment_type' => 'credit', 'extra_player' => 0], $jar);
+    assert_eq(200, $r['status'], strip_tags($r['body']));
+
+    $moved = t_rows('transactions', "member_id = ? AND credit_delta <> 0 AND transaction_type <> 'Opening balance'", [$f['m']]);
+    assert_eq(1, count($moved), 'exactly one row moved the balance');
+    assert_eq(-160, (int) $moved[0]['credit_delta']);
+    assert_eq('member', $moved[0]['actor_type']);
+    assert_eq($f['m'], (int) $moved[0]['actor_id']);
+    assert_eq(340, t_credit($f['m']));
+    assert_eq(340, lsc_credit_ledger_total(t_pdo(), $f['m']), 'statement reconciles');
+});
+
+test('http: an admin booking on a member\'s behalf records the admin, and the member pays', function () {
+    $f = t_credit_fixture();
+    t_pdo()->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('allow_midnight_booking', '1')");
+    $date = date('Y-m-d', strtotime('+2 days'));
+    $adm = t_http_login('8003', 'pwAdm');
+    $r = t_http_post('book-admin-member.php', ['booking_type' => 'member booking', 'date' => $date, 'member_id' => $f['m'],
+        'daily_member_type' => 'individual', 'all_selected_courts' => '2', 'all_selected_times' => '9-10am',
+        'transaction_amount' => 160, 'payment_type' => 'credit', 'extra_player' => 0, 'not_paid_yet' => ''], $adm);
+    assert_eq(200, $r['status'], strip_tags($r['body']));
+
+    $moved = t_rows('transactions', "member_id = ? AND credit_delta <> 0 AND transaction_type <> 'Opening balance'", [$f['m']]);
+    assert_eq(1, count($moved));
+    assert_eq('admin', $moved[0]['actor_type'], 'the admin did it');
+    assert_eq($f['admin'], (int) $moved[0]['actor_id']);
+    assert_eq(340, t_credit($f['m']), 'but the member paid');
+    assert_eq(340, lsc_credit_ledger_total(t_pdo(), $f['m']));
+});
+
+test('http: a member cancelling within the refund window records the member and reconciles', function () {
+    $f = t_credit_fixture();
+    $date = date('Y-m-d', strtotime('+3 days'));
+    t_pdo()->prepare("INSERT INTO transactions (transaction_title, member_id, non_member_id, transaction_amount, transaction_type, payment_type, credit_delta, actor_type) VALUES ('Booking_x', ?, 90001, 160, 'booking (member)', 'credit', -160, 'member')")->execute([$f['m']]);
+    $tx = (int) t_pdo()->lastInsertId();
+    t_pdo()->prepare("UPDATE members SET credit = credit - 160 WHERE id = ?")->execute([$f['m']]);
+    $bk = t_booking(['court' => 1, 'date' => $date, 'timeslot' => '9-10am', 'member_id' => $f['m'], 'transaction_id' => $tx, 'payment' => 'credit']);
+
+    $jar = t_http_login('8001', 'pwM');
+    $r = t_http_post('cancel_booking.php', ['booking_id' => $bk], $jar);
+    assert_eq(200, $r['status']);
+    assert_eq(500, t_credit($f['m']), 'refunded back to the starting balance');
+
+    $refund = t_row('transactions', "member_id = ? AND credit_delta > 0 AND transaction_type = 'cancelled'", [$f['m']]);
+    assert_eq(160, (int) $refund['credit_delta']);
+    assert_eq('member', $refund['actor_type']);
+    assert_eq(500, lsc_credit_ledger_total(t_pdo(), $f['m']), 'statement reconciles after a refund');
+});
+
+test('http: the credit activity page is admin only and shows movements with the actor', function () {
+    $f = t_credit_fixture();
+    assert_eq(302, t_http_get('admin-member-credit.php?member_id=' . $f['m'])['status'], 'not logged in');
+    $member = t_http_login('8001', 'pwM');
+    assert_eq(302, t_http_get('admin-member-credit.php?member_id=' . $f['m'], $member)['status'], 'members redirected');
+
+    $adm = t_http_login('8003', 'pwAdm');
+    lsc_credit_adjust(t_pdo(), $f['m'], 250, 'Cash top up at reception');
+    $body = t_http_get('admin-member-credit.php?member_id=' . $f['m'], $adm)['body'];
+    assert_true(str_contains($body, 'Credit added by admin - Cash top up at reception'), 'reason is shown');
+    assert_true(str_contains($body, 'Balance after'), 'running balance column');
+    assert_true(str_contains($body, 'add up to the current balance'), 'reconciliation confirmed');
+    assert_true(str_contains($body, 'Opening balance'), 'the opening balance is part of the story');
+});
+
+test('http: the activity page warns when the ledger does not add up', function () {
+    $f = t_credit_fixture();
+    // Simulate a balance changed outside the ledger, which is what the old member form did.
+    t_pdo()->prepare('UPDATE members SET credit = credit + 777 WHERE id = ?')->execute([$f['m']]);
+    $adm = t_http_login('8003', 'pwAdm');
+    $body = t_http_get('admin-member-credit.php?member_id=' . $f['m'], $adm)['body'];
+    assert_true(str_contains($body, 'was never recorded'), 'drift is called out');
+    assert_true(str_contains($body, '777'), 'and quantified');
+});
+
+test('http: the member page links to the activity page and no longer has a credit tab', function () {
+    $f = t_credit_fixture();
+    $adm = t_http_login('8003', 'pwAdm');
+    $body = t_http_get('admin-view-member.php?member_id=' . $f['m'], $adm)['body'];
+    assert_true(str_contains($body, 'admin-member-credit.php?member_id=' . $f['m']), 'button links to the statement');
+    assert_true(str_contains($body, 'id="openAdjustCredit"'), 'adjust button sits beside the balance');
+    assert_true(str_contains($body, 'readonly'), 'balance is read-only');
+});

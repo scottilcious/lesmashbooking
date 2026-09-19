@@ -123,7 +123,7 @@ Key/value. Only key today: `allow_midnight_booking`.
 
 **Member / guest**: `index.php` (booking grid), `bookings.php` (my bookings, cancel), `waitlist.php` (my waitlist, confirm/decline), `add-credit.php`, `member-renew.php`, `user-edit.php`.
 
-**Admin**: `index.php` with admin toolbar (book for member, book for guest, academy blocks, court layout), `admin-bookings.php` (all bookings by date with filters), `admin-view-booking.php` (edit, approve, cancel, refund), `admin-members.php`, `admin-view-member.php`, `admin-add-member.php`, `admin-transactions.php`, `admin-view-transaction.php` (approve credit refill), `admin-add-credit.php`, `admin-waitlist.php` (offers awaiting confirmation, guest ones first, plus waitlist by date), `admin-logs.php`, `admin-settings.php`, `view_bookings_by_date.php`.
+**Admin**: `admin-member-credit.php` (per-member credit activity: date, what for, who, in, out, balance after), `index.php` with admin toolbar (book for member, book for guest, academy blocks, court layout), `admin-bookings.php` (all bookings by date with filters), `admin-view-booking.php` (edit, approve, cancel, refund), `admin-members.php`, `admin-view-member.php`, `admin-add-member.php`, `admin-transactions.php`, `admin-view-transaction.php` (approve credit refill), `admin-add-credit.php`, `admin-waitlist.php` (offers awaiting confirmation, guest ones first, plus waitlist by date), `admin-logs.php`, `admin-settings.php`, `view_bookings_by_date.php`.
 
 ## 6. Request flow for a booking
 

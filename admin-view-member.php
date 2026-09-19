@@ -7,83 +7,13 @@ require_once 'includes/password.php';
 require_once 'includes/credit.php';
 $member_id = isset($_GET['member_id']) ? (int) $_GET['member_id'] : 0;
 $transaction_filter = $_GET['transaction_filter'] ?? 'all';
-$allowed_transaction_filters = ['all', 'bookings', 'credit', 'cancellation'];
+$allowed_transaction_filters = ['all', 'bookings', 'cancellation'];
 if (!in_array($transaction_filter, $allowed_transaction_filters, true)) {
     $transaction_filter = 'all';
 }
 $transaction_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $transactions_per_page = 20;
 
-function lsc_member_transaction_badge($transaction_type)
-{
-    switch ($transaction_type) {
-        case 'cancelled booking':
-        case 'cancelled':
-            return '<span class="badge text-bg-danger">Cancelled booking</span>';
-        case 'cancelled-rain-half':
-            return '<span class="badge text-bg-danger">Cancelled booking<br>(Rain/Pollution)<br>- Half refunded</span>';
-        case 'cancelled-rain':
-            return '<span class="badge text-bg-danger">Cancelled booking<br>(Rain/Pollution)<br>- Fully refunded</span>';
-        case 'booking (member)':
-            return '<span class="badge text-bg-success">Member booking</span>';
-        case 'booking (non member)':
-            return '<span class="badge text-bg-success">Non Member booking</span>';
-        case 'Credit refill':
-            return '<span class="badge text-bg-primary">Credit refill</span>';
-        case 'Credit refill - Approved':
-            return '<span class="badge text-bg-primary">Credit refill (approved)</span>';
-        case 'Admin credit add':
-            return '<span class="badge text-bg-info">Admin credit add</span>';
-        case 'Membership renewal':
-            return '<span class="badge text-bg-warning">Membership renewal</span>';
-        default:
-            return '<span class="badge text-bg-secondary">' . htmlspecialchars($transaction_type) . '</span>';
-    }
-}
-
-function lsc_credit_transaction_effect(array $transaction): int
-{
-    $amount = (int) $transaction['transaction_amount'];
-    $transaction_type = $transaction['transaction_type'];
-    $payment_type = $transaction['payment_type'];
-
-    if ($transaction_type === 'Credit refill - Approved') {
-        return $amount;
-    }
-
-    if ($transaction_type === 'Admin credit add') {
-        return $amount;
-    }
-
-    if ($transaction_type === 'booking (member)' && $payment_type === 'credit') {
-        return -$amount;
-    }
-
-    if (in_array($transaction_type, ['cancelled booking', 'cancelled', 'cancelled-rain-half', 'cancelled-rain'], true) && $amount > 0) {
-        return $amount;
-    }
-
-    if ($transaction_type === 'Membership renewal' && $payment_type === 'credit') {
-        return -$amount;
-    }
-
-    return 0;
-}
-
-function lsc_credit_transaction_where(): string
-{
-    return "
-        member_id = ?
-        AND (assoc_transaction_id IS NULL OR assoc_transaction_id = '')
-        AND (
-            (transaction_type = 'booking (member)' AND payment_type = 'credit')
-            OR transaction_type = 'Credit refill - Approved'
-            OR transaction_type = 'Admin credit add'
-            OR (transaction_type IN ('cancelled booking', 'cancelled', 'cancelled-rain-half', 'cancelled-rain') AND transaction_amount > 0)
-            OR (transaction_type = 'Membership renewal' AND payment_type = 'credit')
-        )
-    ";
-}
 ?>
 
 <!-- index.php -->
@@ -237,7 +167,7 @@ function lsc_credit_transaction_where(): string
                                 <button type="button" class="btn btn-primary" id="openAdjustCredit" data-bs-toggle="modal" data-bs-target="#adjustCreditModal">
                                     <i class="ri-add-circle-line"></i> Adjust credit
                                 </button>
-                                <a class="btn btn-outline-primary" href="<?= 'admin-view-member.php?member_id=' . urlencode((string) $member_id) . '&transaction_filter=credit#credit-statement' ?>">
+                                <a class="btn btn-outline-primary" href="admin-member-credit.php?member_id=<?= urlencode((string) $member_id) ?>">
                                     <i class="ri-file-list-3-line"></i> Credit activity
                                 </a>
                             </div>
@@ -284,14 +214,13 @@ function lsc_credit_transaction_where(): string
     <div class="container mb-5">
         <div class="row justify-content-center">
             <div class="col-12 col-md-10">
-                <h4 id="credit-statement">Member Transaction History</h4>
+                <h4>Member Transaction History</h4>
 
                 <?php
                     $base_url = 'admin-view-member.php?member_id=' . urlencode((string) $member_id);
                     $filter_links = [
                         'all' => 'All Transactions',
                         'bookings' => 'Bookings',
-                        'credit' => 'Credit',
                         'cancellation' => 'Cancellation',
                     ];
 
@@ -302,8 +231,6 @@ function lsc_credit_transaction_where(): string
                         $where_sql .= " AND transaction_type IN ('booking (member)', 'booking (non member)')";
                     } elseif ($transaction_filter === 'cancellation') {
                         $where_sql .= " AND transaction_type IN ('cancelled', 'cancelled booking', 'cancelled-rain-half', 'cancelled-rain')";
-                    } elseif ($transaction_filter === 'credit') {
-                        $where_sql = lsc_credit_transaction_where();
                     }
 
                     $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE $where_sql");
@@ -317,19 +244,6 @@ function lsc_credit_transaction_where(): string
                     $stmt->execute($query_params);
                     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    if ($transaction_filter === 'credit') {
-                        $stmt_ledger = $pdo->prepare("SELECT * FROM transactions WHERE $where_sql ORDER BY created_at DESC, transaction_id DESC");
-                        $stmt_ledger->execute($query_params);
-                        $ledger_transactions = $stmt_ledger->fetchAll(PDO::FETCH_ASSOC);
-
-                        $running_balance = (int) $members[0]['credit'];
-                        $credit_balances = [];
-                        foreach ($ledger_transactions as $ledger_transaction) {
-                            $transaction_id = (int) $ledger_transaction['transaction_id'];
-                            $credit_balances[$transaction_id] = $running_balance;
-                            $running_balance -= lsc_credit_transaction_effect($ledger_transaction);
-                        }
-                    }
                 ?>
 
                 <div class="btn-group flex-wrap mb-3" role="group" aria-label="Transaction filters">
@@ -340,11 +254,6 @@ function lsc_credit_transaction_where(): string
                     <?php endforeach; ?>
                 </div>
 
-                <?php if ($transaction_filter === 'credit'): ?>
-                    <div class="alert alert-light border">
-                        Credit statement is calculated from recorded credit transactions and reconciled against the member's current credit balance of <?= number_format((int) $members[0]['credit']) ?> THB.
-                    </div>
-                <?php endif; ?>
 
                 <div class="table-responsive">
                     <table class="table table-bordered">
@@ -353,14 +262,8 @@ function lsc_credit_transaction_where(): string
                                 <th>Date & Time</th>
                                 <th>Transaction title</th>
                                 <th>Transaction type</th>
-                                <?php if ($transaction_filter === 'credit'): ?>
-                                    <th class="text-end">Credit in</th>
-                                    <th class="text-end">Credit out</th>
-                                    <th class="text-end">Remaining</th>
-                                <?php else: ?>
                                     <th>Transaction amount</th>
                                     <th>Slip/Credit</th>
-                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
@@ -383,11 +286,7 @@ function lsc_credit_transaction_where(): string
                                         $stmt_assoc_ts->execute([$value['transaction_id']]);
                                         $get_transaction_data = $stmt_assoc_ts->fetchAll(PDO::FETCH_ASSOC);
 
-                                        $credit_effect = lsc_credit_transaction_effect($value);
-                                        $credit_in = $credit_effect > 0 ? $credit_effect : 0;
-                                        $credit_out = $credit_effect < 0 ? abs($credit_effect) : 0;
-                                        $remaining_credit = $credit_balances[(int) $value['transaction_id']] ?? null;
-                                    ?>
+                                                    ?>
                                     <tr>
                                         <td><?= $readable_date ?></td>
                                         <td>
@@ -401,11 +300,6 @@ function lsc_credit_transaction_where(): string
                                         </td>
                                         <td><?= $transaction_badge ?></td>
 
-                                        <?php if ($transaction_filter === 'credit'): ?>
-                                            <td class="text-end text-success fw-bold"><?= $credit_in > 0 ? number_format($credit_in) : '-' ?></td>
-                                            <td class="text-end text-danger fw-bold"><?= $credit_out > 0 ? number_format($credit_out) : '-' ?></td>
-                                            <td class="text-end fw-bold"><?= $remaining_credit !== null ? number_format($remaining_credit) : '-' ?></td>
-                                        <?php else: ?>
                                             <td>
                                                 <span class="fw-bold fs-3"><?= number_format((int) $value['transaction_amount']) ?></span>
                                                 <?php foreach ($get_transaction_data as $ts_value): ?>
@@ -427,12 +321,11 @@ function lsc_credit_transaction_where(): string
                                                     -
                                                 <?php endif; ?>
                                             </td>
-                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?= $transaction_filter === 'credit' ? 6 : 5 ?>">No transactions found.</td>
+                                    <td colspan="5">No transactions found.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>

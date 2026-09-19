@@ -169,3 +169,86 @@ function lsc_actor_label(?string $actorType, ?string $actorName): string
         default:               return 'Unknown';
     }
 }
+
+/* ---------------------------------------------------------------- statement helpers */
+
+/**
+  * Signed effect on the balance, as recorded when the movement happened.
+  * Rows written for information only carry 0 and never appear in the statement.
+  */
+function lsc_credit_transaction_effect(array $transaction): int
+{
+    return (int) ($transaction['credit_delta'] ?? 0);
+}
+
+function lsc_credit_transaction_where(): string
+{
+    return "member_id = ? AND credit_delta <> 0";
+}
+
+/** What the member's credit was spent on or received for, in plain words. */
+function lsc_credit_description(array $row, array $children): string
+{
+    $type  = (string) $row['transaction_type'];
+    $title = trim((string) $row['transaction_title']);
+    $note  = trim((string) ($row['transaction_note'] ?? ''));
+
+    if (in_array($type, ['booking (member)', 'booking'], true)) {
+        $parts = [];
+        foreach ($children as $c) {
+            $t = trim((string) $c['transaction_title']);
+            // "Booking for date 20 September, 2026, court 3 at 5-6pm" -> "Court 3, 5-6pm on 20 September, 2026"
+            if (preg_match('/date (.+?), court (\d+) at (.+)$/i', $t, $m)) {
+                $parts[] = 'Court ' . $m[2] . ', ' . $m[3] . ' on ' . $m[1];
+            } elseif ($t !== '') {
+                $parts[] = $t;
+            }
+        }
+        if ($parts) {
+            return 'Court booking: ' . implode('; ', $parts);
+        }
+        return 'Court booking';
+    }
+
+    if ($type === 'Admin credit add' || $type === 'Admin credit deduction') {
+        return ($type === 'Admin credit add' ? 'Credit added by admin' : 'Credit deducted by admin')
+             . ($note !== '' ? ' - ' . $note : '');
+    }
+    if ($type === 'Credit refill - Approved') {
+        return 'Credit refill approved';
+    }
+    if ($type === 'Opening balance') {
+        return 'Opening balance';
+    }
+    if (str_starts_with($type, 'cancelled')) {
+        return ($title !== '' ? $title : 'Cancelled booking') . ($note !== '' ? ' (' . $note . ')' : '');
+    }
+    return $title !== '' ? $title : $type;
+}
+
+function lsc_member_transaction_badge($transaction_type)
+{
+    switch ($transaction_type) {
+        case 'cancelled booking':
+        case 'cancelled':
+            return '<span class="badge text-bg-danger">Cancelled booking</span>';
+        case 'cancelled-rain-half':
+            return '<span class="badge text-bg-danger">Cancelled booking<br>(Rain/Pollution)<br>- Half refunded</span>';
+        case 'cancelled-rain':
+            return '<span class="badge text-bg-danger">Cancelled booking<br>(Rain/Pollution)<br>- Fully refunded</span>';
+        case 'booking (member)':
+            return '<span class="badge text-bg-success">Member booking</span>';
+        case 'booking (non member)':
+            return '<span class="badge text-bg-success">Non Member booking</span>';
+        case 'Credit refill':
+            return '<span class="badge text-bg-primary">Credit refill</span>';
+        case 'Credit refill - Approved':
+            return '<span class="badge text-bg-primary">Credit refill (approved)</span>';
+        case 'Admin credit add':
+            return '<span class="badge text-bg-info">Admin credit add</span>';
+        case 'Membership renewal':
+            return '<span class="badge text-bg-warning">Membership renewal</span>';
+        default:
+            return '<span class="badge text-bg-secondary">' . htmlspecialchars($transaction_type) . '</span>';
+    }
+}

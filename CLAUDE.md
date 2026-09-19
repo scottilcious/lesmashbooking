@@ -17,7 +17,9 @@ See `project_spec.md` for the functional specification and `skills.md` for task 
 |---|---|
 | `config.php` | Timezone, loads `config.local.php` (secrets, gitignored), builds `$pdo` via `lsc_create_pdo()` |
 | `includes/functions.php` | `lsc_log()`, LINE broadcast, SMS send, `get_member_info()` |
-| `includes/credit.php` | **The only place a balance changes.** `lsc_credit_move()`, `lsc_credit_adjust()`, `lsc_actor()` |
+| `includes/credit.php` | **The only place a balance changes.** `lsc_credit_move()`, `lsc_credit_adjust()`, `lsc_actor()`, plus the statement helpers (`lsc_credit_description()`, badges) |
+| `admin-member-credit.php` | Per-member credit activity: every movement, what for, by who, balance after |
+| `admin-adjust-credit.php` | The only handler that edits a balance by hand; requires a reason |
 | `includes/logging.php` | Audit log: monthly rotation, web-access guard, `lsc_log_write()` and `lsc_log_query()` |
 | `includes/pricing.php` | **All prices.** Constants + `lsc_price_court/guests/daily_fee/coach()`; `menu.php` publishes them to JS as `window.LSC_PRICING` |
 | `includes/auth.php` | `lsc_require_login/member/guest/admin()`: identity from the session; every handler and admin page calls one |
