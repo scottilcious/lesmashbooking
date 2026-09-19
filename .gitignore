@@ -1,6 +1,7 @@
-logs/
+logs/*
 !logs/.htaccess
-uploads/
+uploads/*
+!uploads/.htaccess
 *.sql
 !database/schema.sql
 .DS_Store
